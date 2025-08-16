@@ -7,7 +7,7 @@ Input: git diff or PR URL. Produce JSON:
 Do not auto-merge. Flag any place where camera or upload logic changed without consent UI.
 """
 arguments = [
-  { name = "pr_or_diff", type = "string", required = true }
+  { name = "pr_or_diff", type = "string", required = true, description = "pull request link" }
 ]
 tools = ["git","filesystem","shell"]
 execution_strategy = "plan"
