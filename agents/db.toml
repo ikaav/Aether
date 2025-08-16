@@ -1,0 +1,18 @@
+version = "1.0"
+[commands.db]
+description = "Produce SQL migrations, index scripts, and verify DDL against the spec's schemas"
+instructions = """
+Input: path to backend output or spec. Produce:
+- Versioned SQL migration files for Postgres that implement the Users, Habits, SessionEvents, TokenBuckets, FloorHistory, Analytics, CosmeticAssets tables from the spec.
+- Index creation scripts and rollback SQL.
+- A small test script that can run migrations and verify core queries.
+Output a JSON manifest: { migrations:[{filename, checksum}], verify_script: 'path' }.
+"""
+arguments = [
+  { name = "backend_path", type = "string", required = true, description = "path to the backend" }
+]
+tools = ["filesystem","shell","git"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

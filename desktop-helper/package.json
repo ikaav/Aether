@@ -1,0 +1,21 @@
+{
+  "name": "aether-desktop-helper",
+  "version": "0.1.0",
+  "description": "Privacy-first Electron helper with hashed window title telemetry and explicit consent.",
+  "main": "src/main/main.js",
+  "author": "Aether Project",
+  "license": "MIT",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node tests/run-tests.js"
+  },
+  "dependencies": {
+  },
+  "optionalDependencies": {
+    "active-win": "^9.0.0"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "schema": {
+    "description": "Onboarding spec schema validation",
+    "required_top_level": ["steps", "skip_points", "analytics_events"],
+    "step_required_fields": ["id", "duration_seconds", "ui_id", "ok"],
+    "skip_point_required_fields": ["step_id", "earliest_seconds"],
+    "analytics_event_required_fields": ["name", "trigger", "payload"]
+  },
+  "checks": {
+    "file_readable": true,
+    "json_parseable": true,
+    "top_level_keys_present": true,
+    "steps_non_empty": true,
+    "step_fields_valid": true,
+    "step_ids_unique": true,
+    "avatar_step_present": true,
+    "avatar_step_constraints": {
+      "duration_seconds_is_8": true,
+      "ui_id_is_avatar_grid": true,
+      "ok_is_string_true": true
+    },
+    "skip_points_reference_existing_steps": true,
+    "skip_points_non_negative_times": true,
+    "analytics_events_have_required_fields": true,
+    "analytics_event_names_unique": true,
+    "test_plan_present": true,
+    "ui_mappings_exist_in_ui_design": {
+      "avatar-grid": true,
+      "habit-preset-selector": true,
+      "quiet-hours-slider": true,
+      "privacy-consent-dialog": true,
+      "system-notifications-prompt": "external_os_prompt",
+      "demo-tile-animation": true,
+      "try-now-button": true,
+      "list-empty-state": true
+    }
+  },
+  "warnings": [
+    {
+      "code": "UI_ID_EXTERNAL",
+      "message": "ui_id 'system-notifications-prompt' is not a design component, treating as platform OS prompt",
+      "impact": "none"
+    }
+  ],
+  "errors": [],
+  "result": "pass",
+  "notes": [
+    "All schema requirements satisfied: steps[], skip_points[], analytics_events[].",
+    "Copy text, accessibility variants, concise variants, error/success copy, and test plan included as required by workflow.",
+    "Durations are within reasonable bounds; step IDs are unique; skip points reference valid steps."
+  ]
+}

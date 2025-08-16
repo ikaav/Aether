@@ -1,0 +1,16 @@
+version = "1.0"
+[commands.pr-review]
+description = "Automated reviewer for diffs, style, license, obvious security issues, privacy regressions, and proof data usage"
+instructions = """
+Input: git diff or PR URL. Produce JSON:
+{ "passed":boolean, "issues":[{type:"security|style|privacy|performance",file,lineno,message,suggestion}], "auto_fix_patch": "<git-patch or null>" }
+Do not auto-merge. Flag any place where camera or upload logic changed without consent UI.
+"""
+arguments = [
+  { name = "pr_or_diff", type = "string", required = true }
+]
+tools = ["git","filesystem","shell"]
+execution_strategy = "plan"
+output_schema = """
+{ "type":"object" }
+"""

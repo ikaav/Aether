@@ -1,0 +1,20 @@
+version = "1.0"
+[commands.ci]
+description = "Orchestrate CI: run tests, run pr-review, run vulnerability scans, publish artifacts, prepare release notes"
+instructions = """
+Input: branch or commit. Actions:
+- run tests agent
+- run pr-review agent
+- run security scans (npm audit / snyk style)
+- if all green, produce release notes draft and a deploy-ready artifact
+Return structured JSON with step results and artifact locations.
+This agent is designed to run in CI mode.
+"""
+arguments = [
+  { name = "ref", type = "string", required = true }
+]
+tools = ["ci","shell","filesystem","git"]
+execution_strategy = "plan"
+output_schema = """
+{ "type":"object" }
+"""

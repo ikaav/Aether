@@ -1,0 +1,20 @@
+version = "1.0"
+model = "gpt-5-high"
+[commands.session-engine]
+description = "Implement server-side session state machine behaviors: start, floor_reached, complete, salvage, repair. Produce unit tests and API handlers"
+instructions = """
+Input: backend path. Implement:
+- start handler: validate max_active_habits, create session_events row, return session_id and server_time
+- floor_reached handler: award token via reward-engine interface, return tokens_awarded
+- complete handler: compute session summary, update token buckets, schedule analytics event
+Produce code stubs, tests, and integration instructions for local run.
+Return structured JSON { handlers: [names], tests: [paths], warnings: [] }.
+"""
+arguments = [
+  { name = "backend_path", type = "string", required = true, description = "path to backend" }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

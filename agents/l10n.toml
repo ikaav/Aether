@@ -1,0 +1,18 @@
+version = "1.0"
+[commands.l10n]
+description = "Extract UI strings and produce locale files for i18n. Provide translation suggestions and export for translators"
+instructions = """
+Input: frontend path. Actions:
+- extract all i18n keys, produce base en.json
+- produce translation suggestion files for target locales (e.g., et, ru)
+- output a mapping manifest used by frontend build
+Return JSON { base_locale: 'path', suggestions: { 'et':'path', ... } }.
+"""
+arguments = [
+  { name = "frontend_path", type = "string", required = true }
+]
+tools = ["filesystem","git"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

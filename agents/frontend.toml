@@ -1,0 +1,25 @@
+version = "1.0"
+model = "gpt-5"
+
+[commands.frontend]
+description = "Generate frontend code for screens and components given ui-design output. Default target: React Native + TypeScript. Creates components, navigation, timer screen, onboarding and unit tests."
+instructions = """
+Input: path to ui-design JSON, target stack optional (default react-native+ts).
+Produce:
+1) A file list with full file contents for each component (tsx), screens, styles, and a package.json.
+2) Test files (jest/playwright) for onboarding and timer flow.
+3) A list of changes as git patch format and a single combined patch file.
+Follow accessibility notes, include i18n keys extraction (for l10n agent).
+If uncertain about a value, set a reasonable default and document it in a generated TODO.md.
+"""
+arguments = [
+  { name = "ui_path", type = "string", required = true, description = "Path to the ui-design JSON output file" },
+  { name = "target", type = "string", required = false, description = "Target frontend stack (react-native|web|expo)" },
+  { name = "out_dir", type = "string", required = true, description = "Directory where generated frontend code should be written" },
+  { name = "output", type = "string", required = true, description = "Path to save the agent's JSON or diff output artifact" }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

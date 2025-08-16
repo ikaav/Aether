@@ -1,0 +1,81 @@
+{
+  "pm_title": "Aether",
+  "source": "artifacts/pm.json",
+  "result": "pass_with_notes",
+  "summary": "Architecture covers all required API endpoints, features, constraints, and milestones from PM. Minor follow-up recommended for weekly EMA reversal UI/API.",
+  "api_surface": {
+    "required": [
+      "/api/v1/sessions/start - POST",
+      "/api/v1/sessions/{session_id}/floor_reached - POST",
+      "/api/v1/sessions/{session_id}/complete - POST",
+      "/api/v1/sessions/{session_id} - GET",
+      "/api/v1/habits - POST",
+      "/api/v1/habits - GET",
+      "/api/v1/habits/{habit_id} - PATCH",
+      "/api/v1/habits/{habit_id}/suggestions - GET",
+      "/api/v1/sync/batch - POST",
+      "/api/v1/auth/refresh - POST",
+      "/api/v1/users/me - GET"
+    ],
+    "implemented": [
+      "/api/v1/sessions/start - POST",
+      "/api/v1/sessions/{session_id}/floor_reached - POST",
+      "/api/v1/sessions/{session_id}/complete - POST",
+      "/api/v1/sessions/{session_id} - GET",
+      "/api/v1/habits - POST",
+      "/api/v1/habits - GET",
+      "/api/v1/habits/{habit_id} - PATCH",
+      "/api/v1/habits/{habit_id}/suggestions - GET",
+      "/api/v1/sync/batch - POST",
+      "/api/v1/auth/refresh - POST",
+      "/api/v1/users/me - GET"
+    ],
+    "missing": [],
+    "extra": [
+      "/api/v1/sessions/{session_id}/heartbeat - POST"
+    ]
+  },
+  "constraints": [
+    {"name": "privacy-first", "status": "covered", "evidence": ["PrivacyManager", "proofs table", "default deny"]},
+    {"name": "passive_defaults", "status": "covered", "evidence": ["NudgingService heat window", "quiet hour policy"]},
+    {"name": "no_gambling", "status": "covered", "evidence": ["TokenRewardsService deterministic thresholds"]},
+    {"name": "sleep_protection", "status": "covered", "evidence": ["user_settings.quiet_hours", "DND guidance"]},
+    {"name": "bedtime_hard_constraint", "status": "covered", "evidence": ["no nudges during quiet hours", "salvage monitoring"]},
+    {"name": "max_active_habits=3", "status": "covered", "evidence": ["HabitService enforcement"]},
+    {"name": "local_processing_by_default", "status": "covered", "evidence": ["mobile offline-first", "proofs local storage"]},
+    {"name": "proofs_optional", "status": "covered", "evidence": ["habit.proof_mode default self_attest"]},
+    {"name": "short_retention_proofs_<=72h", "status": "covered", "evidence": ["proofs.expires_at", "RetentionCleanupJob"]},
+    {"name": "predictable_adjustments", "status": "covered", "evidence": ["EMAFloorService bounds <=80% target", "cooldowns"]},
+    {"name": "reversible_changes_weekly_review", "status": "partial", "evidence": ["floor_history audit"], "note": "Recommend adding explicit revert endpoint and weekly review flow"},
+    {"name": "no_paid_advantages_affect_score", "status": "covered", "evidence": ["no commerce in rewards design"]},
+    {"name": "no_camera_upload_without_consent", "status": "covered", "evidence": ["consent_scope on proofs", "PrivacyManager"]},
+    {"name": "nighttime_salvage_rate_cap=5%", "status": "covered", "evidence": ["KPI monitoring in IaC", "quiet hour policy"]}
+  ],
+  "features": [
+    {"id": "sessions-core", "priority": "high", "status": "covered"},
+    {"id": "sleep-protection", "priority": "high", "status": "covered"},
+    {"id": "privacy-first-proofs", "priority": "high", "status": "covered"},
+    {"id": "habit-management", "priority": "high", "status": "covered"},
+    {"id": "ema-floor", "priority": "med", "status": "covered"},
+    {"id": "rewards-non-gambling", "priority": "med", "status": "covered"},
+    {"id": "offline-sync", "priority": "med", "status": "covered"},
+    {"id": "nudging-heat", "priority": "low", "status": "covered"},
+    {"id": "onboarding-first-run", "priority": "med", "status": "covered"},
+    {"id": "multi-device", "priority": "low", "status": "covered"}
+  ],
+  "milestones": [
+    {"name": "Foundations & Auth", "status": "covered"},
+    {"name": "Core Sessions & Habit CRUD", "status": "covered"},
+    {"name": "EMA & Rewards", "status": "covered"},
+    {"name": "Offline Sync & Multi-Device", "status": "covered"},
+    {"name": "Mobile MVP & Onboarding", "status": "covered"}
+  ],
+  "gaps": [
+    {"item": "Weekly review UI/API for reversing EMA changes", "suggestion": "Add POST /habits/{id}/floor/revert with audit and authorization checks"},
+    {"item": "Operational KPI dashboards", "suggestion": "Add dashboards/alerts for salvage rate <5%, start latency, restart latency"}
+  ],
+  "recommendations": [
+    "Define explicit policy and code hooks for salvage classification on late-night sessions",
+    "Document data retention schedule beyond proofs (e.g., session_events retention tiers)"
+  ]
+}

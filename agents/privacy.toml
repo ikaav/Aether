@@ -1,0 +1,17 @@
+version = "1.0"
+[commands.privacy]
+description = "Implement privacy-first proof manager, proof retention and local hashing procedures"
+instructions = """
+Input: backend_path. Implement proof manager supporting self_attest, app_foreground, photo_hash, wearable_hr.
+- Ensure photo_hash keeps images local, stores only hash for X hours (24-72)
+- Provide consent UI strings, TTL enforcement, and cleanup job
+Return code, tests that assert no upload without consent, and sample privacy policy snippets.
+"""
+arguments = [
+  { name = "backend_path", type = "string", required = true, description = "path to backend" }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

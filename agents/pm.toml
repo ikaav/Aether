@@ -1,0 +1,23 @@
+version = "1.0"
+[commands.pm]
+description = "Product manager, convert a short idea or the Aether spec to prioritized requirements, milestones, acceptance criteria, and minimal API contract snippets"
+instructions = """
+Input: either a one-line product idea (string) or the path to the full spec file. Output must be JSON only.
+Produce the following exact JSON structure:
+{
+  "title": "string",
+  "mvp_features": [{"id":"string","title":"string","priority":"high|med|low","acceptance":["string",...]}],
+  "milestones":[{"name":"string","deliverables":["string",...],"due_days_from_now":int}],
+  "api_surface":["/api/v1/sessions/start - POST","..."],
+  "constraints":["privacy","sleep_protection","max_active_habits=3",...]
+}
+Follow the Aether spec constraints (privacy-first, passive defaults, no gambling). Keep output strict, machine-readable.
+"""
+arguments = [
+  { name = "input", type = "string", required = true, description = "One-line product idea or spec path" }
+]
+tools = ["filesystem","git"]
+execution_strategy = "plan"
+output_schema = """
+{ "type":"object" }
+"""

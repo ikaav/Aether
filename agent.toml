@@ -1,0 +1,25 @@
+version = "1.0"
+model = "gpt-5"
+imports = [
+  "agents/pm.toml",
+  "agents/arch.toml",
+  "agents/ui-design.toml",
+  "agents/onboarding.toml",
+  "agents/frontend.toml",
+  "agents/backend.toml",
+  "agents/db.toml",
+  "agents/session-engine.toml",
+  "agents/floor-engine.toml",
+  "agents/reward-engine.toml",
+  "agents/nudge-engine.toml",
+  "agents/sync.toml",
+  "agents/desktop-helper.toml",
+  "agents/privacy.toml",
+  "agents/tests.toml",
+  "agents/pr-review.toml",
+  "agents/ci.toml",
+  "agents/deploy.toml",
+  "agents/monitor.toml",
+  "agents/docs.toml",
+  "agents/l10n.toml"
+]

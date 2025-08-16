@@ -1,0 +1,15 @@
+version = "1.0"
+[commands.ui-design]
+description = "Generate component list, design tokens, screen wireframes (as JSON), and Tailwind/CSS skeletons based on the spec"
+instructions = """
+Input: arch output or spec. Produce JSON with: components (id, props, accessibility_notes), screens (name, component_ids, interactions), tailwind_tokens (map), animation_specs (map).
+Output must include exact component file names and required props so frontend agent can implement components without ambiguity.
+"""
+arguments = [
+  { name = "context", type = "string", required = true, description = "Path to the architecture output JSON" }
+]
+tools = ["filesystem"]
+execution_strategy = "plan"
+output_schema = """
+{ "type":"object" }
+"""

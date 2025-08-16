@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"> 
+    <title>Aether Desktop Helper — Local Only</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; }
+      .row { margin-bottom: 12px; }
+      code { background: #f5f5f7; padding: 2px 4px; border-radius: 4px; }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eee; }
+    </style>
+  </head>
+  <body>
+    <h1>Privacy-First Telemetry</h1>
+    <p>This helper hashes window titles locally with a per-device salt. No raw titles are stored. Upload is off by default.</p>
+    <div class="row">
+      <input id="titleInput" placeholder="Type a window title to hash" size="40" />
+      <button id="hashBtn">Hash</button>
+      <span class="pill" id="hashOut"></span>
+    </div>
+    <div class="row">
+      <button id="storeBtn">Store Telemetry (Local)</button>
+      <button id="purgeBtn">Purge Local</button>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="uploadToggle"/> Enable Upload (Opt-In)</label>
+      <button id="uploadBtn">Simulate Upload</button>
+    </div>
+    <script src="renderer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+version = "1.0"
+[commands.docs]
+description = "Auto-generate and update README, API docs, and onboarding tutorial snippets from code and spec"
+instructions = """
+Input: project root or spec. Produce:
+- updated README with quickstart, dev run, and architecture overview
+- OpenAPI snippet for API endpoints discovered in code
+- tutorial snippets for onboarding, and a changelog entry template
+Return file list to apply and a git patch.
+"""
+arguments = [
+  { name = "project_root", type = "string", required = true }
+]
+tools = ["filesystem","git"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

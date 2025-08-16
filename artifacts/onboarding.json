@@ -1,0 +1,388 @@
+{
+  "steps": [
+    {
+      "id": "avatar",
+      "duration_seconds": 8,
+      "ui_id": "avatar-grid",
+      "ok": "true",
+      "copy": {
+        "title": "Choose your lantern avatar",
+        "body": "Pick a look for your journey. You can change this anytime.",
+        "primary_label": "Continue",
+        "secondary_label": "Skip for now"
+      },
+      "a11y_copy": {
+        "title_sr": "Avatar selection",
+        "body_sr": "There are twelve avatar options in a 3-column grid. Each avatar is a button. Double-tap to select. The selected avatar will be announced.",
+        "hints": [
+          "Selected state is announced",
+          "All targets are at least 44 points"
+        ]
+      },
+      "concise_copy": {
+        "title": "Pick an avatar",
+        "body": "Choose one and continue"
+      },
+      "error_copy": {
+        "load_failed": "We couldn't load avatars. Check your connection and try again.",
+        "persist_failed": "Avatar couldn't be saved. Retrying…"
+      },
+      "success_copy": "Avatar saved"
+    },
+    {
+      "id": "habit_preset",
+      "duration_seconds": 12,
+      "ui_id": "habit-preset-selector",
+      "ok": "true",
+      "copy": {
+        "title": "Set your starting pace",
+        "body": "Choose Floor, Target, and Stretch times. Start small and grow at your pace.",
+        "primary_label": "Save preset",
+        "secondary_label": "Use recommended"
+      },
+      "a11y_copy": {
+        "title_sr": "Habit time preset",
+        "body_sr": "Three radio options for floor, target, and stretch. You can edit numbers directly.",
+        "hints": [
+          "Numeric input is available for screen readers",
+          "Long-press an option to hear an explanation"
+        ]
+      },
+      "concise_copy": {
+        "title": "Choose times",
+        "body": "Floor, Target, Stretch"
+      },
+      "error_copy": {
+        "invalid_values": "Please set target above floor and stretch above target.",
+        "persist_failed": "Couldn't save your preset. Try again."
+      },
+      "success_copy": "Preset saved"
+    },
+    {
+      "id": "quiet_hours",
+      "duration_seconds": 10,
+      "ui_id": "quiet-hours-slider",
+      "ok": "true",
+      "copy": {
+        "title": "Protect your sleep",
+        "body": "Set quiet hours when Aether stays silent by default. You can still start a session manually.",
+        "primary_label": "Save quiet hours",
+        "secondary_label": "Use 10pm–7am"
+      },
+      "a11y_copy": {
+        "title_sr": "Quiet hours",
+        "body_sr": "Dual-handle slider for start and end time. Text inputs are available as an alternative.",
+        "hints": [
+          "Times snap in 15 minute steps",
+          "Start and end cannot be equal"
+        ]
+      },
+      "concise_copy": {
+        "title": "Quiet hours",
+        "body": "Default 10pm–7am"
+      },
+      "error_copy": {
+        "invalid_range": "Start and end can't be the same.",
+        "persist_failed": "Couldn't save quiet hours. Try again."
+      },
+      "success_copy": "Quiet hours saved"
+    },
+    {
+      "id": "privacy_consent",
+      "duration_seconds": 12,
+      "ui_id": "privacy-consent-dialog",
+      "ok": "true",
+      "copy": {
+        "title": "Privacy choices",
+        "body": "Local-first by default. No gambling mechanics. You control what is shared. Review and choose what you allow.",
+        "primary_label": "I agree",
+        "secondary_label": "Not now"
+      },
+      "a11y_copy": {
+        "title_sr": "Privacy consent",
+        "body_sr": "Modal dialog with two options, Allow and Not now. Focus is trapped until you make a choice.",
+        "hints": [
+          "We announce the first heading on open",
+          "Close button is available"
+        ]
+      },
+      "concise_copy": {
+        "title": "Review privacy",
+        "body": "Choose what to allow"
+      },
+      "error_copy": {
+        "persist_failed": "Couldn't record your choice. Please try again."
+      },
+      "success_copy": "Choices saved"
+    },
+    {
+      "id": "notifications_permission",
+      "duration_seconds": 6,
+      "ui_id": "system-notifications-prompt",
+      "ok": "true",
+      "copy": {
+        "title": "Gentle reminders (optional)",
+        "body": "Allow notifications to get timely nudges during your preferred hours.",
+        "primary_label": "Allow notifications",
+        "secondary_label": "Not now"
+      },
+      "a11y_copy": {
+        "title_sr": "Notifications permission",
+        "body_sr": "We will show the system prompt next. You can allow or don't allow.",
+        "hints": [
+          "We'll respect your quiet hours",
+          "You can change this anytime in Settings"
+        ]
+      },
+      "concise_copy": {
+        "title": "Notifications?",
+        "body": "Optional, respects quiet hours"
+      },
+      "error_copy": {
+        "os_prompt_failed": "Couldn't open the system prompt. Try again from Settings."
+      },
+      "success_copy": "Preference saved"
+    },
+    {
+      "id": "demo",
+      "duration_seconds": 10,
+      "ui_id": "demo-tile-animation",
+      "ok": "true",
+      "copy": {
+        "title": "See progress in action",
+        "body": "A tile lights up when you complete your floor. Simple, satisfying, and non-gambling.",
+        "primary_label": "Next",
+        "secondary_label": "Skip"
+      },
+      "a11y_copy": {
+        "title_sr": "Demo animation",
+        "body_sr": "The animation is decorative. A caption describes what's happening.",
+        "hints": [
+          "Reduced motion shows a static frame"
+        ]
+      },
+      "concise_copy": {
+        "title": "How it feels",
+        "body": "Tiles light up when floor is done"
+      },
+      "error_copy": {
+        "load_failed": "Couldn't load the demo. You can continue without it."
+      },
+      "success_copy": "Demo viewed"
+    },
+    {
+      "id": "first_trial",
+      "duration_seconds": 8,
+      "ui_id": "try-now-button",
+      "ok": "true",
+      "copy": {
+        "title": "Try a 60-second floor",
+        "body": "Tap Start to feel the rhythm. You can stop anytime.",
+        "primary_label": "Start trial",
+        "secondary_label": "Maybe later"
+      },
+      "a11y_copy": {
+        "title_sr": "Start a 60 second trial",
+        "body_sr": "Primary button labeled Start trial. A timer screen will open.",
+        "hints": [
+          "We announce when the session completes"
+        ]
+      },
+      "concise_copy": {
+        "title": "Start 60s trial",
+        "body": "Feel the flow"
+      },
+      "error_copy": {
+        "navigation_failed": "Couldn't open the timer. Try again.",
+        "session_failed": "We couldn't start a session. Please retry."
+      },
+      "success_copy": "Trial started"
+    },
+    {
+      "id": "success",
+      "duration_seconds": 4,
+      "ui_id": "list-empty-state",
+      "ok": "true",
+      "copy": {
+        "title": "You're in!",
+        "body": "Onboarding complete. Add your first habit to begin.",
+        "primary_label": "Add a habit",
+        "secondary_label": "Explore app"
+      },
+      "a11y_copy": {
+        "title_sr": "Onboarding complete",
+        "body_sr": "You can now add your first habit or explore the app.",
+        "hints": [
+          "Primary action opens Add Habit"
+        ]
+      },
+      "concise_copy": {
+        "title": "Done",
+        "body": "Let's add a habit"
+      },
+      "success_copy": "Onboarding complete"
+    }
+  ],
+  "skip_points": [
+    { "step_id": "avatar", "earliest_seconds": 3 },
+    { "step_id": "habit_preset", "earliest_seconds": 4 },
+    { "step_id": "quiet_hours", "earliest_seconds": 3 },
+    { "step_id": "privacy_consent", "earliest_seconds": 2 },
+    { "step_id": "notifications_permission", "earliest_seconds": 0 },
+    { "step_id": "demo", "earliest_seconds": 0 },
+    { "step_id": "first_trial", "earliest_seconds": 0 },
+    { "step_id": "success", "earliest_seconds": 0 }
+  ],
+  "analytics_events": [
+    {
+      "name": "onboarding_step_view",
+      "trigger": "When a specific onboarding step becomes visible",
+      "payload": {
+        "step_id": "string",
+        "timestamp": "iso8601",
+        "variant": "string | null",
+        "ab_bucket": "string | null"
+      }
+    },
+    {
+      "name": "onboarding_step_complete",
+      "trigger": "User completes required interaction for a step",
+      "payload": {
+        "step_id": "string",
+        "duration_ms": "number",
+        "success": "boolean",
+        "error_code": "string | null"
+      }
+    },
+    {
+      "name": "onboarding_step_skip",
+      "trigger": "User taps Skip at or after earliest skip time",
+      "payload": {
+        "step_id": "string",
+        "elapsed_ms": "number",
+        "reason": "string | null"
+      }
+    },
+    {
+      "name": "avatar_selected",
+      "trigger": "User selects an avatar in AvatarGrid",
+      "payload": {
+        "avatar_id": "string",
+        "from_step": "avatar"
+      }
+    },
+    {
+      "name": "habit_preset_changed",
+      "trigger": "User changes floor/target/stretch in HabitPresetSelector",
+      "payload": {
+        "floor_seconds": "number",
+        "target_seconds": "number",
+        "stretch_seconds": "number",
+        "used_recommended": "boolean"
+      }
+    },
+    {
+      "name": "quiet_hours_set",
+      "trigger": "User updates QuietHoursSlider and saves",
+      "payload": {
+        "start": "HH:mm",
+        "end": "HH:mm",
+        "duration_hours": "number"
+      }
+    },
+    {
+      "name": "privacy_consent_choice",
+      "trigger": "User chooses allow/deny in PrivacyConsentDialog",
+      "payload": {
+        "choice": "allow | deny | defer",
+        "permissions": "string[]",
+        "retention": "string | null"
+      }
+    },
+    {
+      "name": "os_push_prompt_shown",
+      "trigger": "System push permission prompt is displayed",
+      "payload": {
+        "platform": "ios | android",
+        "from_step": "notifications_permission"
+      }
+    },
+    {
+      "name": "os_push_prompt_result",
+      "trigger": "User responds to system push prompt",
+      "payload": {
+        "platform": "ios | android",
+        "result": "authorized | denied | provisional | ephemeral | not_supported"
+      }
+    },
+    {
+      "name": "demo_viewed",
+      "trigger": "Demo tile animation completes one loop or user taps Next",
+      "payload": {
+        "played_seconds": "number",
+        "skipped": "boolean"
+      }
+    },
+    {
+      "name": "trial_start",
+      "trigger": "User taps TryNowButton to start Timer",
+      "payload": {
+        "trial_seconds": "number",
+        "from_step": "first_trial"
+      }
+    },
+    {
+      "name": "onboarding_complete",
+      "trigger": "All required onboarding steps completed",
+      "payload": {
+        "total_duration_ms": "number",
+        "skipped_steps": "string[]"
+      }
+    },
+    {
+      "name": "onboarding_transition_time",
+      "trigger": "Between-step navigation animation completes",
+      "payload": {
+        "from_step": "string",
+        "to_step": "string",
+        "transition_ms": "number"
+      }
+    },
+    {
+      "name": "meta_test_plan",
+      "trigger": "Static test plan for E2E automation",
+      "payload": {
+        "happy_path": [
+          "Load onboarding, view avatar, select avatar, next",
+          "Set recommended habit preset (60/300/600), save",
+          "Set quiet hours to 22:00–07:00, save",
+          "Accept privacy consent",
+          "Allow notifications (if supported), result authorized",
+          "View demo for >=3s, next",
+          "Tap Start trial, Timer opens"
+        ],
+        "skip_and_exit": [
+          "Skip avatar after 3s",
+          "Skip demo, skip first_trial, reach success"
+        ],
+        "a11y": [
+          "All actionable elements have accessibilityRole",
+          "Screen reader focus starts at step title",
+          "Avatar selection announces selected state",
+          "Quiet hours exposes text inputs",
+          "Modal privacy dialog traps focus and has dismiss"
+        ],
+        "performance": [
+          "Step transition time <= 300ms (95th percentile)",
+          "Animation respects reduced motion setting"
+        ],
+        "analytics": [
+          "onboarding_step_view fires on each step",
+          "onboarding_step_complete fires with success true on save actions",
+          "onboarding_step_skip fires when skipping within allowed windows",
+          "os_push_prompt_shown/result fire appropriately"
+        ]
+      }
+    }
+  ]
+}

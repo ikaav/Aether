@@ -1,0 +1,15 @@
+version = "1.0"
+[commands.desktop-helper]
+description = "Produce an optional Electron desktop helper that performs hashed window title monitoring, local-only proofs, and upload consent flows"
+instructions = """
+Input: nothing or backend path. Produce:
+- electron project skeleton, hashed window title collector, local storage behavior, consent dialog mechanics.
+- strict privacy-first behavior: default local-only, explicit upload consent flow
+Return: file set and tests demonstrating hashed telemetry and scheduled cleanup.
+"""
+arguments = []
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

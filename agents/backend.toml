@@ -1,0 +1,21 @@
+version = "1.0"
+model = "gpt-5-high"
+[commands.backend]
+description = "Generate backend service code, routes, DB migrations, session engine stubs, and tests. Default stack Node.js + TypeScript + Express + TypeORM for Postgres"
+instructions = """
+Input: arch output or API contract. Produce:
+- Express service skeleton, controllers for /api/v1/sessions, /api/v1/habits, auth endpoints
+- JWT auth middleware, refresh token flow
+- SQL migration files matching the spec schemas
+- Unit and integration tests that mock DB and simulate session start/floor/complete
+Return a git patch set and a runnable local dev script (npm run dev) plus Dockerfile.
+If asked to modify an existing repo, create minimal diffs and do not delete unrelated files.
+"""
+arguments = [
+  { name = "api_spec", type = "string", required = true, description = "spec path" }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

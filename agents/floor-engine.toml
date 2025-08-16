@@ -1,0 +1,19 @@
+version = "1.0"
+model = "gpt-5-high"
+[commands.floor-engine]
+description = "Nightly EMA-based floor adjustment engine. Produce batch job code, tests, and a proposed adjustment report generator (for Sunday review)"
+instructions = """
+Input: DB connection string or backend path. Implement the EMA algorithm from the spec:
+- run nightly batch, compute new EMA per habit, evaluate raise/lower rules, enforce cooldowns
+- log proposals into floor_history with trigger 'auto' and 'proposed_at'
+- output a JSON report of adjustments for the weekly review endpoint
+Return: a runnable job script, tests for raise and lower cases, and a report JSON example.
+"""
+arguments = [
+  { name = "db_url", type = "string", required = true, description = "database url" }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

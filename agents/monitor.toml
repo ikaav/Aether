@@ -1,0 +1,18 @@
+version = "1.0"
+[commands.monitor]
+description = "Periodic log analyzer and incident summarizer. Create tickets for anomalies and summarize root causes"
+instructions = """
+Input: path to logs or logging MCP. Actions:
+- parse recent logs, find error spikes, summarize incidents in human readable Markdown plus a structured JSON incident report
+- create draft tickets with suggested fixes
+Return { incidents:[{id,title,severity,summary,lines}], suggested_fixes:[] }.
+This agent can be scheduled or triggered by alerts.
+"""
+arguments = [
+  { name = "log_path", type = "string", required = true }
+]
+tools = ["filesystem","shell","ci"]
+execution_strategy = "plan"
+output_schema = """
+{ "type":"object" }
+"""

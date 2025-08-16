@@ -1,0 +1,18 @@
+version = "1.0"
+[commands.sync]
+description = "Create offline sync protocol, conflict resolution logic, and a batch sync endpoint"
+instructions = """
+Input: backend path. Implement:
+- client and server sync payload formats
+- conflict resolution strategies: merge sessions within 5 minutes, keep_both otherwise
+- retry/backoff logic and QA tests that simulate conflicts
+Return: sync endpoint spec, code, and conflict resolution unit tests.
+"""
+arguments = [
+  { name = "backend_path", type = "string", required = true, description = "path to backend" }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

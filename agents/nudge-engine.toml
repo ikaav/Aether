@@ -1,0 +1,18 @@
+version = "1.0"
+[commands.nudge-engine]
+description = "Implement heat-based nudging system. Provide service endpoints to evaluate shouldShowNudge and produce message templates"
+instructions = """
+Input: backend path. Implement:
+- calculateHeatScore(signals) with weights and thresholds from spec
+- shouldShowNudge(user_id, habit_id) that respects DND and recent nudge limits
+- generateNudgeMessage(habit, heat)
+Return code, tests, and a JSON API mock for integration with frontend push notifications.
+"""
+arguments = [
+  { name = "backend_path", type = "string", required = true, description = "path to backend" }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

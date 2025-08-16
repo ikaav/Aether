@@ -1,0 +1,20 @@
+version = "1.0"
+[commands.deploy]
+description = "Generate and run deployment commands, produce IaC for staging and production, perform health checks and automated rollback on failure"
+instructions = """
+Input: env (staging|prod) and artifact location. Produce:
+- IaC templates (Terraform/CloudFormation snippets or kubernetes manifests) with minimal privileges
+- deployment runbook and rollback commands
+- health check script and canary release plan
+Return JSON with { deployment_steps: [...], health_check: 'path', rollback_steps: [...] }.
+This agent must require a human approval flag for production runs.
+"""
+arguments = [
+  { name = "env", type = "string", required = true },
+  { name = "artifact", type = "string", required = true }
+]
+tools = ["shell","git","filesystem"]
+execution_strategy = "plan"
+output_schema = """
+{ "type":"object" }
+"""

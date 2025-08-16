@@ -1,0 +1,214 @@
+{
+  "stack_choice": {
+    "backend": {
+      "language": "Node.js",
+      "version": "20 LTS",
+      "typescript": "5.x",
+      "framework": "Express",
+      "auth": "OAuth2 password/PKCE + JWT access with refresh tokens",
+      "orm": "TypeORM",
+      "testing": "Jest + Supertest",
+      "linting": "ESLint + Prettier",
+      "api_style": "REST JSON (versioned /api/v1)",
+      "env": ["development", "staging", "production"]
+    },
+    "database": {
+      "primary": "PostgreSQL 15",
+      "migrations": "SQL files via TypeORM migrations",
+      "pooling": "pg-pool",
+      "extensions": ["uuid-ossp", "pgcrypto", "citext"],
+      "notes": "Prefer UUID v4 primary keys; use timestamptz; JSONB for metadata"
+    },
+    "cache_queue": {
+      "redis": "Redis 7.x",
+      "usage": ["session heartbeats", "rate limiting", "idempotency keys", "background job queue (BullMQ)"]
+    },
+    "mobile": {
+      "ios": "SwiftUI (Swift 5.9)",
+      "android": "Kotlin (Jetpack Compose)",
+      "offline": "Local-first storage with background sync",
+      "privacy": "Proofs stored locally by default; hashes only; explicit consent for uploads",
+      "dnd_integration": "Use native APIs to toggle/guide DND during floor phase where permitted"
+    }
+  },
+  "services": [
+    {"name": "AuthService", "responsibilities": ["User signup/login via OAuth2/PKCE", "Issue JWT access + refresh tokens", "Refresh endpoint", "Key rotation"], "dependencies": ["Postgres", "Redis"], "notes": "Short-lived access tokens (15m), refresh (14d), rotate on use"},
+    {"name": "UserService", "responsibilities": ["User profiles", "Privacy settings", "Quiet hours management", "Device registration"], "dependencies": ["Postgres"]},
+    {"name": "HabitService", "responsibilities": ["Create/Read/Update habits", "Enforce max_active_habits=3", "Per-habit timing presets", "Proof mode per habit"], "dependencies": ["Postgres"], "notes": "Validate durations, cadence presets, enforce unique names per user optional"},
+    {"name": "SessionService", "responsibilities": ["Start session", "Floor reached", "Complete session", "Heartbeat handling (30s)", "Conflict detection for concurrent devices", "Server-side timestamping to prevent skew"], "dependencies": ["Postgres", "Redis"], "notes": "Implements SessionStateMachine with DND hooks via mobile clients; idle_timeout_sec=300"},
+    {"name": "TokenRewardsService", "responsibilities": ["Deterministic token awards at floor", "Capacity limits", "Unlock triggers (cosmetic/story)", "No RNG"], "dependencies": ["Postgres"], "notes": "Implements predictable thresholds; optional quiet accrual without spam"},
+    {"name": "EMAFloorService", "responsibilities": ["Nightly batch computes EMA-based floor adjustments", "Never raise above 80% target", "Cooldowns and reversibility", "Log to floor_history"], "dependencies": ["Postgres"], "notes": "Runs as scheduled job/cron; emits audit trail"},
+    {"name": "RetentionCleanupJob", "responsibilities": ["Purge expired proofs (<=72h)", "Data minimization tasks"], "dependencies": ["Postgres"], "notes": "Runs hourly via scheduler; deletes proofs where now() > expires_at"},
+    {"name": "SyncService", "responsibilities": ["Batch ingest of offline events", "Idempotent deduplication by session_id/client_event_id", "Conflict resolution policies (merge/keep_both/server_wins)", "Per-event results"], "dependencies": ["Postgres", "Redis"], "notes": "Uses Redis SETNX idempotency key session:{session_id}:{event_type} with TTL"},
+    {"name": "NudgingService", "responsibilities": ["Heat-based nudges (0.2-0.7 window)", "Respect quiet hours and DND", "Per-habit frequency caps"], "dependencies": ["Postgres", "Calendar integrations via mobile"], "notes": "Disabled during quiet hours by policy"},
+    {"name": "PrivacyManager", "responsibilities": ["Consent registry", "Proof-mode policy enforcement", "Default deny for unknown actions", "Retention windows (<=72h)"], "dependencies": ["Postgres"], "notes": "Proof assets not uploaded unless consent; store only metadata/hashes if ever needed"}
+  ],
+  "folder_scaffold": [
+    {"path": "backend/", "purpose": "Node.js + TS API service"},
+    {"path": "backend/src/", "purpose": "Application source code"},
+    {"path": "backend/src/config/", "purpose": "Configuration and environment loading"},
+    {"path": "backend/src/routes/", "purpose": "Express route handlers (REST endpoints)"},
+    {"path": "backend/src/controllers/", "purpose": "HTTP controllers mapping to services"},
+    {"path": "backend/src/services/", "purpose": "Domain services (Auth, Session, Habit, EMA, Rewards, Sync)"},
+    {"path": "backend/src/db/", "purpose": "DB connection and repositories"},
+    {"path": "backend/src/db/migrations/", "purpose": "SQL/TypeORM migration files"},
+    {"path": "backend/src/jobs/", "purpose": "Scheduled jobs (EMA nightly, retention cleanup)"},
+    {"path": "backend/src/middleware/", "purpose": "Auth, rate limits, request validation, metrics"},
+    {"path": "backend/src/types/", "purpose": "TypeScript types and DTOs"},
+    {"path": "backend/src/utils/", "purpose": "Utilities and helpers"},
+    {"path": "backend/test/", "purpose": "Unit and integration tests"},
+    {"path": "backend/test/e2e/", "purpose": "End-to-end tests"},
+    {"path": "mobile/", "purpose": "Native mobile clients"},
+    {"path": "mobile/ios/", "purpose": "SwiftUI app"},
+    {"path": "mobile/android/", "purpose": "Kotlin app"},
+    {"path": "infra/", "purpose": "Infrastructure as code and deployment"},
+    {"path": "infra/docker/", "purpose": "Dockerfiles and docker-compose"},
+    {"path": "infra/terraform/", "purpose": "Terraform IaC for cloud resources"},
+    {"path": "scripts/", "purpose": "Developer scripts (setup, migrations)"},
+    {"path": "docs/", "purpose": "Architecture and API docs"}
+  ],
+  "iac_suggestions": {
+    "local_dev": {
+      "docker_compose": ["postgres:15 with init SQL and healthcheck", "redis:7 for cache/queue", "backend service with hot reload"],
+      "secrets": "dotenv (.env, .env.local); do not commit",
+      "migrations": "npm run typeorm migration:run on container start"
+    },
+    "cloud": {
+      "provider": "AWS",
+      "compute": "ECS Fargate service (1-3 tasks, autoscaling by CPU/RPS)",
+      "db": "Amazon RDS PostgreSQL (db.t3.medium dev → t4g.medium prod)",
+      "cache": "ElastiCache Redis (t4g.micro dev → cache.t4g.small prod)",
+      "networking": "VPC with 2 AZs, ALB, private subnets for RDS/Redis",
+      "secrets": "AWS SSM Parameter Store for config, KMS encryption",
+      "scheduler": "EventBridge rule @midnight UTC to trigger EMA job (Fargate task) and hourly retention cleanup",
+      "logging": "CloudWatch Logs, retention 30-90 days; structured JSON",
+      "ci_cd": "GitHub Actions → ECR build/push → ECS deploy",
+      "monitoring": "Health checks, synthetic ping of /healthz, KPIs for start latency, restart latency, salvage <5%",
+      "security": "JWT validation at edge optional (Lambda@Edge) not required; strict CORS; WAF rate limits"
+    }
+  },
+  "db_tables": [
+    {"name": "users", "ddl": "CREATE TABLE IF NOT EXISTS users (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  email CITEXT UNIQUE NOT NULL,\n  display_name TEXT,\n  auth_provider TEXT NOT NULL DEFAULT 'password',\n  password_hash TEXT,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_users_email ON users (email);"},
+    {"name": "user_settings", "ddl": "CREATE TABLE IF NOT EXISTS user_settings (\n  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,\n  privacy JSONB NOT NULL DEFAULT '{\"default_deny\":true}',\n  quiet_hours JSONB NOT NULL DEFAULT '{\"start\":\"22:00\",\"end\":\"07:00\"}',\n  max_active_habits SMALLINT NOT NULL DEFAULT 3,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);"},
+    {"name": "user_keys", "ddl": "CREATE TABLE IF NOT EXISTS user_keys (\n  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,\n  public_key TEXT NOT NULL,\n  encrypted_private_key TEXT,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);"},
+    {"name": "devices", "ddl": "CREATE TABLE IF NOT EXISTS devices (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  platform TEXT NOT NULL,\n  push_token TEXT,\n  last_seen TIMESTAMPTZ,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id);"},
+    {"name": "habits", "ddl": "CREATE TABLE IF NOT EXISTS habits (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  name TEXT NOT NULL,\n  cadence JSONB NOT NULL,\n  floor_sec INT NOT NULL CHECK (floor_sec > 0),\n  target_sec INT NOT NULL CHECK (target_sec >= floor_sec),\n  stretch_sec INT CHECK (stretch_sec >= target_sec),\n  proof_mode TEXT NOT NULL DEFAULT 'self_attest',\n  active BOOLEAN NOT NULL DEFAULT true,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  UNIQUE(user_id, name)\n);\nCREATE INDEX IF NOT EXISTS idx_habits_user ON habits(user_id);"},
+    {"name": "sessions", "ddl": "CREATE TABLE IF NOT EXISTS sessions (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  habit_id UUID NOT NULL REFERENCES habits(id) ON DELETE CASCADE,\n  device_id UUID REFERENCES devices(id) ON DELETE SET NULL,\n  state TEXT NOT NULL,\n  has_concurrency BOOLEAN NOT NULL DEFAULT false,\n  started_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  floor_reached_at TIMESTAMPTZ,\n  completed_at TIMESTAMPTZ,\n  server_created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  server_updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);\nCREATE INDEX IF NOT EXISTS idx_sessions_habit ON sessions(habit_id);"},
+    {"name": "session_events", "ddl": "CREATE TABLE IF NOT EXISTS session_events (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,\n  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  event_type TEXT NOT NULL,\n  server_ts TIMESTAMPTZ NOT NULL DEFAULT now(),\n  client_ts TIMESTAMPTZ,\n  client_event_id UUID,\n  meta JSONB,\n  UNIQUE(session_id, event_type, server_ts)\n);\nCREATE INDEX IF NOT EXISTS idx_session_events_session ON session_events(session_id);\nCREATE INDEX IF NOT EXISTS idx_session_events_client_id ON session_events(client_event_id);"},
+    {"name": "token_buckets", "ddl": "CREATE TABLE IF NOT EXISTS token_buckets (\n  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,\n  current_tokens INT NOT NULL DEFAULT 0,\n  capacity INT NOT NULL DEFAULT 100,\n  last_awarded_at TIMESTAMPTZ\n);"},
+    {"name": "token_ledger", "ddl": "CREATE TABLE IF NOT EXISTS token_ledger (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  delta INT NOT NULL,\n  reason TEXT NOT NULL,\n  session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_token_ledger_user ON token_ledger(user_id);"},
+    {"name": "floor_history", "ddl": "CREATE TABLE IF NOT EXISTS floor_history (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  habit_id UUID NOT NULL REFERENCES habits(id) ON DELETE CASCADE,\n  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  previous_floor_sec INT NOT NULL,\n  new_floor_sec INT NOT NULL,\n  ema_snapshot JSONB NOT NULL,\n  reason TEXT NOT NULL,\n  effective_date DATE NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_floor_history_habit ON floor_history(habit_id);"},
+    {"name": "proofs", "ddl": "CREATE TABLE IF NOT EXISTS proofs (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,\n  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  proof_type TEXT NOT NULL,\n  consent_scope TEXT NOT NULL,\n  stored_locally BOOLEAN NOT NULL DEFAULT true,\n  metadata JSONB,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  expires_at TIMESTAMPTZ\n);\nCREATE INDEX IF NOT EXISTS idx_proofs_session ON proofs(session_id);"}
+  ],
+  "api_routes": [
+    {"method": "POST", "path": "/api/v1/auth/refresh", "summary": "Exchange refresh token for new access token", "auth": "Refresh token in HTTP-only cookie or body", "requestBody": {"refresh_token": "string"}, "responses": {"200": {"access_token": "jwt", "expires_in": 900}, "401": {"error": "invalid_token"}}},
+    {"method": "GET", "path": "/api/v1/users/me", "summary": "Current user profile and settings", "auth": "Bearer access token", "responses": {"200": {"user": {"id": "uuid", "email": "string", "settings": {}}}, "401": {"error": "unauthorized"}}},
+    {"method": "POST", "path": "/api/v1/habits", "summary": "Create a habit", "auth": "Bearer", "requestBody": {"name": "string", "cadence": {}, "floor_sec": 60, "target_sec": 300, "stretch_sec": 600, "proof_mode": "self_attest|photo_hash"}, "responses": {"201": {"habit": {"id": "uuid"}}, "400": {"error": "validation"}}},
+    {"method": "GET", "path": "/api/v1/habits", "summary": "List habits", "auth": "Bearer", "responses": {"200": {"habits": []}}},
+    {"method": "PATCH", "path": "/api/v1/habits/{habit_id}", "summary": "Update habit fields", "auth": "Bearer", "params": {"habit_id": "uuid"}, "requestBody": {"name": "string?", "cadence": "json?", "floor_sec": "int?", "target_sec": "int?", "stretch_sec": "int?", "proof_mode": "string?", "active": "boolean?"}, "responses": {"200": {"habit": {}}, "404": {"error": "not_found"}}},
+    {"method": "GET", "path": "/api/v1/habits/{habit_id}/suggestions", "summary": "EMA-based floor adjustment suggestion", "auth": "Bearer", "params": {"habit_id": "uuid"}, "responses": {"200": {"suggestion": {"proposed_floor_sec": 90, "effective_date": "date", "rationale": "string"}}, "404": {"error": "not_found"}}},
+    {"method": "POST", "path": "/api/v1/sessions/start", "summary": "Start a habit session", "auth": "Bearer", "requestBody": {"habit_id": "uuid", "device_id": "uuid?", "client_ts": "iso8601"}, "responses": {"201": {"session_id": "uuid", "started_at": "iso8601"}, "409": {"warning": "other_active_session"}}},
+    {"method": "POST", "path": "/api/v1/sessions/{session_id}/floor_reached", "summary": "Mark floor reached and award token", "auth": "Bearer", "params": {"session_id": "uuid"}, "requestBody": {"client_ts": "iso8601"}, "responses": {"200": {"awarded": 1, "bucket": {"current_tokens": 11}}, "409": {"error": "already_marked"}}},
+    {"method": "POST", "path": "/api/v1/sessions/{session_id}/complete", "summary": "Complete session (target/stretch)", "auth": "Bearer", "params": {"session_id": "uuid"}, "requestBody": {"client_ts": "iso8601", "final_state": "floor|target|stretch"}, "responses": {"200": {"summary": {"floor": true, "target": true, "duration_sec": 300}}, "409": {"error": "not_started"}}},
+    {"method": "POST", "path": "/api/v1/sessions/{session_id}/heartbeat", "summary": "Heartbeat to keep session active (every ~30s)", "auth": "Bearer", "params": {"session_id": "uuid"}, "requestBody": {"client_ts": "iso8601"}, "responses": {"200": {"status": "ok"}, "410": {"error": "inactive"}}},
+    {"method": "GET", "path": "/api/v1/sessions/{session_id}", "summary": "Get session state", "auth": "Bearer", "params": {"session_id": "uuid"}, "responses": {"200": {"session": {"state": "string", "started_at": "iso8601", "floor_reached_at": "iso8601?", "completed_at": "iso8601?"}}, "404": {"error": "not_found"}}},
+    {"method": "POST", "path": "/api/v1/sync/batch", "summary": "Batch upload offline events and receive per-event results", "auth": "Bearer", "requestBody": {"events": [{"client_event_id": "uuid", "type": "start|floor_reached|complete|heartbeat", "session_id": "uuid", "habit_id": "uuid", "client_ts": "iso8601", "meta": {}}]}, "responses": {"200": {"results": [{"client_event_id": "uuid", "status": "applied|duplicate|conflict", "server_ts": "iso8601"}]}}}
+  ],
+  "patch_ready_files": [
+    {"filename": "backend/package.json", "summary": "Node.js project manifest with scripts (build, dev, test, lint) and deps (express, typeorm, pg, zod, jsonwebtoken, bcrypt, bullmq)"},
+    {"filename": "backend/tsconfig.json", "summary": "TypeScript config targeting ES2022, strict true, path aliases for src/*"},
+    {"filename": "backend/src/index.ts", "summary": "Express app bootstrap, JSON middleware, healthz route, mounts /api/v1 routers"},
+    {"filename": "backend/src/config/env.ts", "summary": "Loads environment variables with defaults and zod validation (PORT, DATABASE_URL, REDIS_URL, JWT secrets)"},
+    {"filename": "backend/src/db/data-source.ts", "summary": "TypeORM DataSource setup with Postgres, snake_case naming, migrations path"},
+    {"filename": "backend/src/middleware/auth.ts", "summary": "JWT Bearer validation, attach user to req, handles refresh token cookie parsing"},
+    {"filename": "backend/src/middleware/metrics.ts", "summary": "Basic request timing and KPI hooks for start/restart latency"},
+    {"filename": "backend/src/routes/habits.ts", "summary": "Express Router implementing POST /habits, GET /habits, PATCH /habits/:id with request validation"},
+    {"filename": "backend/src/routes/sessions.ts", "summary": "Express Router implementing /sessions/start, /:id/floor_reached, /:id/complete, /:id/heartbeat, GET /:id"},
+    {"filename": "backend/src/routes/sync.ts", "summary": "Express Router for POST /sync/batch idempotent ingest"},
+    {"filename": "backend/src/routes/auth.ts", "summary": "Express Router for POST /auth/refresh"},
+    {"filename": "backend/src/services/SessionStateMachine.ts", "summary": "Pure functions handling state transitions and invariants; timestamps sourced server-side"},
+    {"filename": "backend/src/services/EMAFloorJob.ts", "summary": "Nightly EMA computation job; applies bounds (<=80% target), cooldowns, writes floor_history"},
+    {"filename": "backend/src/jobs/RetentionCleanupJob.ts", "summary": "Deletes expired proofs and other short-retention records"},
+    {"filename": "backend/src/services/TokenRewardsService.ts", "summary": "Awards deterministic tokens at floor, updates token_buckets, writes token_ledger"},
+    {"filename": "backend/src/services/SyncService.ts", "summary": "Batch apply client events with idempotency and conflict results"},
+    {"filename": "backend/src/db/migrations/001_init.sql", "summary": "SQL migration creating users, user_settings, user_keys, devices, habits, sessions, session_events, token_buckets, token_ledger, floor_history, proofs"},
+    {"filename": "infra/docker/docker-compose.yml", "summary": "Services: postgres, redis, backend; healthchecks; volumes; environment"},
+    {"filename": "infra/terraform/main.tf", "summary": "Terraform skeleton with AWS provider, VPC module references, ECS cluster, RDS and ElastiCache placeholders"},
+    {"filename": "mobile/ios/README.md", "summary": "SwiftUI app plan: onboarding, Timer screen, offline queue, DND guidance"},
+    {"filename": "mobile/android/README.md", "summary": "Kotlin app plan mirroring iOS with WorkManager for sync"},
+    {"filename": "docs/API.md", "summary": "Human-readable summary of API routes and schemas"},
+    {"filename": "README.md", "summary": "Project overview, how to run locally, environment variables, and architecture summary"},
+    {"filename": ".github/workflows/ci.yml", "summary": "CI pipeline: install, lint, build, test, docker build; on push PR"},
+    {"filename": "backend/test/e2e/first_completion.spec.ts", "summary": "E2E: onboarding to first trial session awards 1 token and completes"}
+  ],
+  "validation": {
+    "api_surface_coverage": {
+      "required": [
+        "/api/v1/sessions/start - POST",
+        "/api/v1/sessions/{session_id}/floor_reached - POST",
+        "/api/v1/sessions/{session_id}/complete - POST",
+        "/api/v1/sessions/{session_id} - GET",
+        "/api/v1/habits - POST",
+        "/api/v1/habits - GET",
+        "/api/v1/habits/{habit_id} - PATCH",
+        "/api/v1/habits/{habit_id}/suggestions - GET",
+        "/api/v1/sync/batch - POST",
+        "/api/v1/auth/refresh - POST",
+        "/api/v1/users/me - GET"
+      ],
+      "implemented": [
+        "/api/v1/sessions/start - POST",
+        "/api/v1/sessions/{session_id}/floor_reached - POST",
+        "/api/v1/sessions/{session_id}/complete - POST",
+        "/api/v1/sessions/{session_id} - GET",
+        "/api/v1/habits - POST",
+        "/api/v1/habits - GET",
+        "/api/v1/habits/{habit_id} - PATCH",
+        "/api/v1/habits/{habit_id}/suggestions - GET",
+        "/api/v1/sync/batch - POST",
+        "/api/v1/auth/refresh - POST",
+        "/api/v1/users/me - GET"
+      ],
+      "missing": []
+    },
+    "constraints_coverage": [
+      {"constraint": "privacy-first", "status": "covered", "notes": "PrivacyManager, proofs default local-only; consent gates"},
+      {"constraint": "passive_defaults", "status": "covered", "notes": "Nudging disabled by default outside heat window and during quiet hours"},
+      {"constraint": "no_gambling", "status": "covered", "notes": "TokenRewardsService deterministic thresholds; no RNG"},
+      {"constraint": "sleep_protection", "status": "covered", "notes": "Quiet hours in user_settings; NudgingService blocks; DND guidance on clients"},
+      {"constraint": "bedtime_hard_constraint", "status": "covered", "notes": "No nudges during quiet hours; sessions flagged for salvage policies if started in quiet window"},
+      {"constraint": "max_active_habits=3", "status": "covered", "notes": "Enforced in HabitService with transactional checks"},
+      {"constraint": "local_processing_by_default", "status": "covered", "notes": "Mobile offline-first; proofs stored locally; server only stores hashes/metadata if consent"},
+      {"constraint": "proofs_optional", "status": "covered", "notes": "Per-habit proof_mode with default self_attest"},
+      {"constraint": "short_retention_proofs_<=72h", "status": "covered", "notes": "proofs.expires_at + RetentionCleanupJob"},
+      {"constraint": "predictable_adjustments", "status": "covered", "notes": "EMAFloorService bounds and cooldowns"},
+      {"constraint": "reversible_changes_weekly_review", "status": "partially-covered", "notes": "floor_history audit supports reversal; UI/API for weekly review to be added"},
+      {"constraint": "no_paid_advantages_affect_score", "status": "covered", "notes": "No commerce in rewards; policy documented"},
+      {"constraint": "no_camera_upload_without_consent", "status": "covered", "notes": "PrivacyManager enforces consent_scope; clients default deny"},
+      {"constraint": "nighttime_salvage_rate_cap=5%", "status": "covered", "notes": "Monitoring KPI in IaC + Nudging/sleep protections; requires ops tracking"}
+    ],
+    "features_coverage": [
+      {"id": "sessions-core", "status": "covered", "coverage": {"services": ["SessionService", "TokenRewardsService"], "tables": ["sessions", "session_events", "token_buckets", "token_ledger"], "routes": ["/api/v1/sessions/start", "/api/v1/sessions/{session_id}/floor_reached", "/api/v1/sessions/{session_id}/complete", "/api/v1/sessions/{session_id}"]}, "notes": "Server timestamps canonical; DND handled on clients"},
+      {"id": "sleep-protection", "status": "covered", "coverage": {"services": ["UserService", "NudgingService"], "tables": ["user_settings"], "routes": []}, "notes": "Quiet hours default 22:00-07:00; nudges blocked; DND guidance"},
+      {"id": "privacy-first-proofs", "status": "covered", "coverage": {"services": ["PrivacyManager", "RetentionCleanupJob"], "tables": ["proofs", "user_settings", "user_keys"], "routes": []}, "notes": "Proofs local by default; retention <=72h with cleanup"},
+      {"id": "habit-management", "status": "covered", "coverage": {"services": ["HabitService"], "tables": ["habits", "floor_history"], "routes": ["/api/v1/habits (POST,GET)", "/api/v1/habits/{habit_id} (PATCH)", "/api/v1/habits/{habit_id}/suggestions (GET)"]}, "notes": "max_active_habits=3 enforced"},
+      {"id": "ema-floor", "status": "covered", "coverage": {"services": ["EMAFloorService"], "tables": ["floor_history", "habits"], "routes": ["/api/v1/habits/{habit_id}/suggestions (GET)"]}, "notes": "<=80% target; cooldowns; reversible via history"},
+      {"id": "rewards-non-gambling", "status": "covered", "coverage": {"services": ["TokenRewardsService"], "tables": ["token_buckets", "token_ledger"], "routes": ["/api/v1/sessions/{session_id}/floor_reached (POST)"]}, "notes": "Deterministic; capacity limits"},
+      {"id": "offline-sync", "status": "covered", "coverage": {"services": ["SyncService"], "tables": ["session_events"], "routes": ["/api/v1/sync/batch (POST)"]}, "notes": "Idempotency via client_event_id + Redis keys; conflict results returned"},
+      {"id": "nudging-heat", "status": "covered", "coverage": {"services": ["NudgingService"], "tables": ["user_settings"], "routes": []}, "notes": "Heat window 0.2-0.7; respects quiet hours, DND, calendar"},
+      {"id": "onboarding-first-run", "status": "covered", "coverage": {"services": ["AuthService", "HabitService", "SessionService", "TokenRewardsService"], "tables": ["users", "habits", "sessions", "token_buckets"], "routes": ["/api/v1/habits", "/api/v1/sessions/start", "/api/v1/sessions/{session_id}/floor_reached"]}, "notes": "Trial session 60s floor supported"},
+      {"id": "multi-device", "status": "covered", "coverage": {"services": ["SessionService", "SyncService"], "tables": ["sessions", "devices"], "routes": ["/api/v1/sessions/start (warn)", "/api/v1/sessions/{session_id}/heartbeat"]}, "notes": "Concurrent sessions accepted and flagged via sessions.has_concurrency; warning surfaced"}
+    ],
+    "milestones_alignment": [
+      {"name": "Foundations & Auth", "status": "covered", "notes": "AuthService, users table, user_settings, user_keys; PrivacyManager; CI pipeline"},
+      {"name": "Core Sessions & Habit CRUD", "status": "covered", "notes": "Session routes + state machine; Habit CRUD; migrations listed"},
+      {"name": "EMA & Rewards", "status": "covered", "notes": "EMAFloorJob, TokenRewardsService, suggestions route, KPI hooks via metrics middleware and CloudWatch"},
+      {"name": "Offline Sync & Multi-Device", "status": "covered", "notes": "Sync batch, conflict policies, heartbeat, concurrent-session warnings"},
+      {"name": "Mobile MVP & Onboarding", "status": "covered", "notes": "Mobile READMEs outline onboarding, timer; Quiet hours and nudge safeguards"}
+    ],
+    "gaps": [
+      {"item": "Weekly review UI/API for reversing EMA changes", "suggestion": "Add endpoint POST /habits/{id}/floor/revert with audit"},
+      {"item": "Implement concurrency detection logic", "suggestion": "When overlapping sessions found, set sessions.has_concurrency=true and include warning in responses"}
+    ]
+  }
+}

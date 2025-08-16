@@ -1,0 +1,19 @@
+version = "1.0"
+model = "gpt-5-high"
+[commands.reward-engine]
+description = "Implement token bucket logic, unlocking cosmetics, quiet period handling, and token expiration. Produce API functions and tests."
+instructions = """
+Input: backend path. Create functions:
+- incrementTokenBucket(user_id, habit_id), respecting capacity, quiet periods, and visibility rules
+- checkForUnlocks(bucket) per spec
+- applyUnlock(user_id, asset_id)
+Return: code, tests, and example responses for /sessions/{id}/floor_reached API.
+"""
+arguments = [
+  { name = "backend_path", type = "string", required = true, description = "path to the backend }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""

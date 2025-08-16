@@ -1,0 +1,1778 @@
+# Aether - Complete Technical Specification
+
+## 1. NAME & PURPOSE
+**Aether** - Make habit initiation frictionless, automate gentle recovery, visually reinforce real consistency, and protect sleep, privacy, intrinsic motivation, and cognitive load.
+
+## 2. PRIMARY GOALS (Ranked)
+1. Maximize reliable starts and fast restarts, not brittle streaks
+2. Prevent late-night rescue abuse and protect sleep
+3. Keep privacy first, proofs optional and local
+4. Default to low friction, passive inference, with opt-in escalation
+5. Reward competence predictably, not gambling
+
+## 3. DESIGN PRINCIPLES (Non-negotiable)
+- Default to passive, local computation, minimal prompts
+- Make automated changes reversible via weekly review
+- Ceilings and floors change slowly; changes are predictable and explainable
+- Proofs are opt-in, on-device by default, short retention
+- Max active habits default = 3, unlock rules controlled
+- Immediate, clear visual feedback for starts and completions
+- No gambling mechanics, no paid advantages that affect score
+- Bedtime and anti-shame are hard constraints
+
+## 4. TARGET METRICS (Initial KPI Targets)
+- Median open-to-start < 20 seconds
+- Fraction of floors completed per user per week > 0.7 after 4 weeks
+- Fraction of sessions continuing past floor > 0.4
+- Median restart latency after a miss ≤ 1 day
+- Nighttime salvage rate < 5% of completions
+
+---
+
+## 5. TECHNICAL ARCHITECTURE
+
+### Tech Stack Recommendation
+**Backend:**
+- Language: Node.js with TypeScript or Go
+- Database: PostgreSQL with Redis for caching
+- API: REST with GraphQL consideration for complex queries
+- Cloud: AWS/GCP with serverless functions for batch jobs
+- Authentication: OAuth2 + JWT with refresh tokens
+- Queue: Redis Bull or AWS SQS for background jobs
+
+**Mobile:**
+- iOS: SwiftUI with Core Data, CloudKit optional
+- Android: Kotlin with Room database, WorkManager
+- Shared: Protocol Buffers for API communication
+- Analytics: Custom events with batch upload
+
+**Desktop Helper (Optional):**
+- Electron or native (Swift/C++) for window title monitoring
+- Local-only processing with hashed outputs
+
+### Database Architecture
+**Primary Tables:**
+- `users` - user profiles, preferences, encryption keys
+- `habits` - habit definitions, scheduling, algorithm state
+- `session_events` - all session activities, immutable log
+- `token_buckets` - reward state per habit
+- `floor_history` - audit trail of automatic adjustments
+- `analytics_events` - telemetry with algorithm versioning
+
+**Indexes for Performance:**
+```sql
+-- Critical query patterns
+CREATE INDEX idx_sessions_habit_date ON session_events(habit_id, DATE(started_at));
+CREATE INDEX idx_sessions_user_recent ON session_events(user_id, started_at DESC);
+CREATE INDEX idx_tokens_user_habit ON token_buckets(user_id, habit_id);
+CREATE INDEX idx_analytics_cohort ON analytics_events(user_id, event_type, timestamp);
+```
+
+### API Endpoint Specification
+
+**Authentication:** Bearer tokens with 15-minute access tokens, 30-day refresh tokens
+
+#### Core Session Endpoints
+
+**POST /api/v1/sessions/start**
+```json
+Request:
+{
+  "habit_id": "uuid",
+  "device_info": {
+    "platform": "iOS|Android",
+    "version": "1.0.0",
+    "timezone": "Europe/Tallinn"
+  },
+  "context": {
+    "inferred_state": "at_desk|commuting|home",
+    "confidence": 0.8,
+    "manual_tags": ["tired", "focused"]
+  }
+}
+
+Response:
+{
+  "session_id": "uuid",
+  "server_time": "2025-08-15T10:30:00Z",
+  "habit": { /* full habit object */ },
+  "concurrent_session_warning": null|"Another device has active session"
+}
+```
+
+**POST /api/v1/sessions/{session_id}/floor_reached**
+```json
+Request:
+{
+  "duration_seconds": 65,
+  "client_timestamp": "2025-08-15T10:31:05Z",
+  "proof_data": null|{ "method": "self_attest", "metadata_hash": "sha256" }
+}
+
+Response:
+{
+  "tokens_awarded": 1,
+  "new_token_count": 3,
+  "unlock_triggered": null|{ "type": "cosmetic", "asset_id": "lantern_blue" }
+}
+```
+
+**POST /api/v1/sessions/{session_id}/complete**
+```json
+Request:
+{
+  "total_duration_seconds": 1800,
+  "target_reached": true,
+  "continue_prompted": true,
+  "continue_accepted": true,
+  "early_exit_reason": null|"user_cancel"|"system_interrupt"
+}
+
+Response:
+{
+  "session_summary": {
+    "floor_met": true,
+    "target_met": true,
+    "tokens_awarded": 1,
+    "score_impact": { "old_score": 0.8, "new_score": 0.85 }
+  }
+}
+```
+
+#### Habit Management Endpoints
+
+**POST /api/v1/habits**
+```json
+Request:
+{
+  "name": "Morning Pages",
+  "category": "creativity",
+  "cadence": {
+    "type": "daily|weekdays|n_per_week|custom",
+    "params": { "n": 5, "preferred_days": [1,2,3,4,5] }
+  },
+  "timing": {
+    "floor_seconds": 180,
+    "target_seconds": 1200,
+    "stretch_seconds": 1800,
+    "min_floor_seconds": 60
+  },
+  "preferences": {
+    "priority": 0.8,
+    "keystone": false,
+    "resource_url": "notion://page/abc123",
+    "proof_mode": "self_attest"
+  }
+}
+```
+
+**GET /api/v1/habits/{habit_id}/suggestions**
+```json
+Response:
+{
+  "floor_adjustment": {
+    "current": 180,
+    "suggested": 189,
+    "reason": "EMA indicates consistent completion, gradual increase recommended",
+    "confidence": 0.85,
+    "effective_date": "2025-08-22"
+  },
+  "cadence_optimization": null,
+  "context_patterns": [
+    { "time_slot": "07:00-09:00", "success_rate": 0.9 },
+    { "context": "at_desk", "success_rate": 0.7 }
+  ]
+}
+```
+
+### Deep Link Handling
+
+**Supported URL Schemes:**
+- Web URLs: `https://`, `http://`
+- Native apps: `spotify://`, `notion://`, `obsidian://`
+- Files: `file://` (mobile sandbox only)
+- Custom: `aether://habit/{habit_id}/start`
+
+**Implementation:**
+```typescript
+class DeepLinkManager {
+  async openResource(url: string): Promise<boolean> {
+    try {
+      if (await this.canOpenURL(url)) {
+        await this.openURL(url);
+        return true;
+      } else {
+        this.logEvent('deep_link_failed', { url: this.hashURL(url) });
+        return false;
+      }
+    } catch (error) {
+      this.logEvent('deep_link_error', { error: error.message });
+      return false;
+    }
+  }
+}
+```
+
+### Multi-Device Timer Synchronization
+
+**Conflict Resolution Rules:**
+1. **Same habit, overlapping sessions:** Server accepts both, flags for user review
+2. **Network partition recovery:** Merge by session_id deduplication
+3. **Clock skew:** Use server timestamp as canonical, adjust local durations
+
+**Offline Sync Protocol:**
+```typescript
+interface SyncPayload {
+  device_id: string;
+  last_sync_timestamp: string;
+  pending_events: SessionEvent[];
+  conflict_resolution: 'server_wins' | 'manual_merge';
+}
+
+// Client sync logic
+async syncWithServer(): Promise<SyncResult> {
+  const pending = await this.localDB.getPendingEvents();
+  const response = await this.api.sync({
+    device_id: this.deviceId,
+    last_sync_timestamp: this.lastSync,
+    pending_events: pending
+  });
+  
+  // Handle conflicts
+  for (const conflict of response.conflicts) {
+    await this.resolveConflict(conflict);
+  }
+  
+  return response;
+}
+```
+
+---
+
+## 6. ONBOARDING (Refined Timing: 75-85 seconds)
+
+### Flow Breakdown with Flexibility
+1. **Avatar Selection (8s):** Grid of 12 options, one-tap selection
+2. **Habit Setup (35s total):** 
+   - Choose 1-3 habits from curated list or custom (15s)
+   - For each habit: Floor/Target/Stretch preset selection with 10s edit window per habit (20s)
+   - **Flexibility addition:** "Review & Edit" optional step for users who want more time
+3. **Quiet Hours (6s):** Default 22:00-07:00 with quick adjust sliders
+4. **Demo Animation (10s):** Show tile lighting up after sample completion
+5. **First Trial (16-26s):** "Try it now" button starts actual 60s floor session
+
+### Enhanced UX Considerations
+- **Skip option** available after 30s for power users
+- **Preset explanations** on long-press for clarity
+- **Accessibility** support with larger targets and voice guidance
+
+---
+
+## 7. CORE SYSTEMS IMPLEMENTATION
+
+### State Machine with Error Handling
+
+```typescript
+enum SessionState {
+  IDLE = 'idle',
+  STARTING = 'starting',
+  FLOOR_RUNNING = 'floor_running',
+  FLOOR_MET = 'floor_met',
+  TARGET_RUNNING = 'target_running',
+  COMPLETING = 'completing',
+  COMPLETED = 'completed',
+  SALVAGING = 'salvaging',
+  REPAIRING = 'repairing',
+  ERROR = 'error'
+}
+
+class SessionStateMachine {
+  async transition(from: SessionState, to: SessionState, event: any): Promise<boolean> {
+    // Validate transition
+    if (!this.isValidTransition(from, to)) {
+      throw new InvalidTransitionError(`Cannot transition from ${from} to ${to}`);
+    }
+    
+    // Execute side effects
+    await this.executeTransitionEffects(from, to, event);
+    
+    // Persist state change
+    await this.persistStateChange(to, event);
+    
+    return true;
+  }
+  
+  private async executeTransitionEffects(from: SessionState, to: SessionState, event: any) {
+    switch (to) {
+      case SessionState.FLOOR_RUNNING:
+        await this.enableDND();
+        await this.openDeepLink(event.resource_url);
+        await this.startTimer(event.floor_seconds);
+        break;
+      case SessionState.FLOOR_MET:
+        await this.awardToken();
+        await this.triggerHaptic(HapticType.SUCCESS);
+        await this.showContinuePrompt();
+        break;
+      // ... other cases
+    }
+  }
+}
+```
+
+### Adaptive Floor Algorithm (Enhanced EMA)
+
+```typescript
+interface EMAConfig {
+  alpha: number; // 0.2 default
+  lowerThreshold: number; // 0.75
+  raiseThreshold: number; // 0.9
+  lowerDaysRequired: number; // 3
+  raiseDaysRequired: number; // 7
+  raiseFactor: number; // 1.05
+  lowerFactor: number; // 0.9
+  maxRaiseFrequency: number; // 7 days
+  repairCooldown: number; // 72 hours
+}
+
+class FloorAdjustmentEngine {
+  async processNightlyUpdates(userId: string): Promise<FloorAdjustment[]> {
+    const habits = await this.getUserHabits(userId);
+    const adjustments: FloorAdjustment[] = [];
+    
+    for (const habit of habits) {
+      const todayCompletion = await this.getTodayCompletion(habit.id);
+      const newEMA = this.updateEMA(habit.ema, todayCompletion);
+      
+      const adjustment = await this.evaluateFloorAdjustment(habit, newEMA);
+      if (adjustment) {
+        adjustments.push(adjustment);
+        await this.logFloorHistory(habit.id, adjustment);
+      }
+      
+      await this.updateHabitEMA(habit.id, newEMA);
+    }
+    
+    return adjustments;
+  }
+  
+  private async evaluateFloorAdjustment(habit: Habit, ema: number): Promise<FloorAdjustment | null> {
+    const consecutiveLow = await this.getConsecutiveDaysBelow(habit.id, this.config.lowerThreshold);
+    const consecutiveHigh = await this.getConsecutiveDaysAbove(habit.id, this.config.raiseThreshold);
+    
+    const now = new Date();
+    const lastRepair = habit.last_repair_ritual_ts ? new Date(habit.last_repair_ritual_ts) : null;
+    const lastRaise = habit.last_floor_raise_ts ? new Date(habit.last_floor_raise_ts) : null;
+    
+    // Lower floor if consistently below threshold
+    if (consecutiveLow >= this.config.lowerDaysRequired) {
+      const newFloor = Math.max(
+        habit.min_floor_seconds,
+        Math.round(habit.floor_seconds * this.config.lowerFactor)
+      );
+      
+      if (newFloor < habit.floor_seconds) {
+        return {
+          habitId: habit.id,
+          oldValue: habit.floor_seconds,
+          newValue: newFloor,
+          reason: 'ema_lower',
+          emaSnapshot: ema
+        };
+      }
+    }
+    
+    // Raise floor if consistently above threshold (with cooldowns)
+    if (consecutiveHigh >= this.config.raiseDaysRequired) {
+      const hoursSinceRepair = lastRepair ? (now.getTime() - lastRepair.getTime()) / (1000 * 60 * 60) : Infinity;
+      const daysSinceRaise = lastRaise ? (now.getTime() - lastRaise.getTime()) / (1000 * 60 * 60 * 24) : Infinity;
+      
+      if (hoursSinceRepair > this.config.repairCooldown && daysSinceRaise > this.config.maxRaiseFrequency) {
+        const targetCap = habit.target_seconds * 0.8; // Don't raise floor above 80% of target
+        const newFloor = Math.min(
+          targetCap,
+          Math.round(habit.floor_seconds * this.config.raiseFactor)
+        );
+        
+        if (newFloor > habit.floor_seconds) {
+          return {
+            habitId: habit.id,
+            oldValue: habit.floor_seconds,
+            newValue: newFloor,
+            reason: 'ema_raise',
+            emaSnapshot: ema
+          };
+        }
+      }
+    }
+    
+    return null;
+  }
+}
+```
+
+### Token System & Reward Engine
+
+```typescript
+interface RewardUnlock {
+  type: 'cosmetic' | 'story' | 'soundtrack';
+  assetId: string;
+  rarity: 'common' | 'rare' | 'epic';
+  unlockCost: number;
+  metadata: Record<string, any>;
+}
+
+class RewardEngine {
+  async processTokenAward(habitId: string, userId: string): Promise<TokenResult> {
+    const bucket = await this.getTokenBucket(userId, habitId);
+    
+    if (bucket.current_tokens >= 4) {
+      return { tokensAdded: 0, reason: 'at_capacity' };
+    }
+    
+    // Check quiet period
+    if (bucket.quiet_until && new Date() < bucket.quiet_until) {
+      return { 
+        tokensAdded: 1, 
+        reason: 'quiet_period',
+        tokensVisible: false 
+      };
+    }
+    
+    await this.incrementTokenBucket(bucket);
+    const unlocks = await this.checkForUnlocks(bucket);
+    
+    return {
+      tokensAdded: 1,
+      newTotal: bucket.current_tokens + 1,
+      unlocksTriggered: unlocks
+    };
+  }
+  
+  private async checkForUnlocks(bucket: TokenBucket): Promise<RewardUnlock[]> {
+    const unlocks: RewardUnlock[] = [];
+    
+    if (bucket.current_tokens >= 2) {
+      const cosmetic = await this.selectRandomCosmetic(bucket.habit_id);
+      if (cosmetic) unlocks.push(cosmetic);
+    }
+    
+    if (bucket.current_tokens >= 3) {
+      const story = await this.selectStoryPostcard(bucket.habit_id);
+      if (story) unlocks.push(story);
+    }
+    
+    if (bucket.current_tokens >= 4) {
+      const premium = await this.selectPremiumUnlock(bucket.habit_id);
+      if (premium) unlocks.push(premium);
+    }
+    
+    return unlocks;
+  }
+}
+```
+
+### Heat-Based Nudging System
+
+```typescript
+interface HeatSignals {
+  recentStarts: number; // 0-1, recent session frequency
+  calendarBusy: number; // 0-1, how busy today looks
+  sleepDebt: number; // 0-1, estimated tiredness
+  timeOfDay: number; // 0-1, based on personal patterns
+  deviceUsage: number; // 0-1, recent app activity
+}
+
+class NudgeEngine {
+  calculateHeatScore(signals: HeatSignals): number {
+    const weights = {
+      recentStarts: 0.25,
+      calendarBusy: 0.20,
+      sleepDebt: 0.25,
+      timeOfDay: 0.15,
+      deviceUsage: 0.15
+    };
+    
+    return Math.min(1.0, 
+      weights.recentStarts * signals.recentStarts +
+      weights.calendarBusy * signals.calendarBusy +
+      weights.sleepDebt * signals.sleepDebt +
+      weights.timeOfDay * signals.timeOfDay +
+      weights.deviceUsage * signals.deviceUsage
+    );
+  }
+  
+  async shouldShowNudge(userId: string, habitId: string): Promise<boolean> {
+    const heat = await this.calculateCurrentHeat(userId);
+    
+    // Only nudge in the "sweet spot"
+    if (heat < 0.2 || heat > 0.7) {
+      return false;
+    }
+    
+    // Respect user's DND and calendar
+    if (await this.isUserBusy(userId)) {
+      return false;
+    }
+    
+    // Check nudge frequency limits
+    if (await this.recentNudgesSent(userId, habitId) > 2) {
+      return false;
+    }
+    
+    return true;
+  }
+  
+  generateNudgeMessage(habit: Habit, heat: number): string {
+    const templates = [
+      "Your {habit_name} lantern is ready to light 🏮",
+      "Perfect time for {habit_name}. Start?",
+      "Your {habit_name} space is prepared ✨"
+    ];
+    
+    const template = templates[Math.floor(heat * templates.length)];
+    return template.replace('{habit_name}', habit.name);
+  }
+}
+```
+
+---
+
+## 8. UI/UX IMPLEMENTATION GUIDE
+
+### Screen Specifications
+
+#### Home Screen Layout
+```typescript
+interface HomeScreenLayout {
+  header: {
+    dateDisplay: string; // "Friday, August 15"
+    consistencyRing: {
+      percentage: number; // 0-100
+      label: string; // "4 of 5 habits this week"
+      onTap: () => void; // Navigate to Sunday Chapter
+    };
+  };
+  
+  habitCards: Array<{
+    habitId: string;
+    title: string;
+    startButton: {
+      size: 'large'; // 60x60pt minimum
+      state: 'ready' | 'running' | 'completed';
+      onTap: () => Promise<void>;
+    };
+    contextHint: string; // "Best time: mornings"
+    todayProgress: 'none' | 'floor' | 'target' | 'stretch';
+    nextScheduled: Date | null;
+  }>;
+  
+  bottomActions: {
+    queueIcon: { badgeCount: number };
+    addHabitButton: { visible: boolean };
+    settingsIcon: { visible: true };
+  };
+}
+```
+
+#### Timer Screen Implementation
+```typescript
+class TimerScreen extends React.Component {
+  render() {
+    return (
+      <View style={styles.timerContainer}>
+        <CircularProgress
+          progress={this.state.progress}
+          size={200}
+          strokeWidth={8}
+          color={this.getProgressColor()}
+          backgroundColor="rgba(255,255,255,0.1)"
+        />
+        
+        <Text style={styles.timeRemaining}>
+          {formatTime(this.state.secondsRemaining)}
+        </Text>
+        
+        {this.state.floorReached && (
+          <TouchableOpacity
+            style={styles.continueButton}
+            onPress={this.handleContinue}
+          >
+            <Text>Continue to Target</Text>
+          </TouchableOpacity>
+        )}
+        
+        {this.state.canCancel && (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={this.handleCancel}
+          >
+            <Text>Hold to Cancel</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+}
+```
+
+### Animation Specifications
+
+**Token Award Animation:**
+```typescript
+const tokenAwardAnimation = {
+  spawn: {
+    count: 8,
+    position: 'session_complete_button',
+    particles: {
+      size: [4, 8],
+      color: '#D4A53E',
+      opacity: [1, 0],
+      duration: 800
+    }
+  },
+  path: {
+    type: 'bezier',
+    control1: { x: 0.2, y: -0.3 },
+    control2: { x: 0.8, y: -0.1 },
+    destination: 'token_bucket_icon'
+  },
+  completion: {
+    bounce: { scale: [1.0, 1.2, 1.0], duration: 200 },
+    glow: { opacity: [0.3, 0.8, 0.3], duration: 600 }
+  }
+};
+```
+
+**Floor Completion Ripple:**
+```typescript
+const floorCompletionRipple = {
+  trigger: 'floor_timer_complete',
+  effect: {
+    type: 'expanding_ring',
+    startRadius: 0,
+    endRadius: 100,
+    color: '#0E6B4A',
+    opacity: [0.8, 0],
+    duration: 350,
+    easing: 'easeOutCubic'
+  },
+  followUp: {
+    delay: 100,
+    haptic: { type: 'success', duration: 50 }
+  }
+};
+```
+
+### Design System Implementation
+
+**Color Tokens (CSS Custom Properties):**
+```css
+:root {
+  --color-deep-navy: #0B2340;
+  --color-forest-emerald: #0E6B4A;
+  --color-warm-gold: #D4A53E;
+  --color-parchment: #F6EFE6;
+  --color-muted-crimson: #A83E3E;
+  --color-soft-ink: #2E2E2E;
+  --color-overlay-glow: rgba(255,255,255,0.06);
+  
+  /* Semantic tokens */
+  --color-primary: var(--color-deep-navy);
+  --color-success: var(--color-forest-emerald);
+  --color-accent: var(--color-warm-gold);
+  --color-surface: var(--color-parchment);
+  --color-warning: var(--color-muted-crimson);
+  --color-text: var(--color-soft-ink);
+}
+```
+
+**Typography Scale:**
+```css
+.text-hero {
+  font-family: 'Crimson Text', serif; /* Storybook serif for titles */
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.text-body {
+  font-family: 'Inter', sans-serif; /* Humanist sans for UI */
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.text-numeric {
+  font-family: 'SF Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+```
+
+---
+
+## 9. DATA MODEL (Complete Schemas)
+
+### Core Tables
+
+```sql
+-- Users table with encryption keys
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  -- Settings
+  timezone VARCHAR(50) DEFAULT 'UTC',
+  bedtime_cutoff TIME DEFAULT '22:00',
+  max_active_habits INTEGER DEFAULT 3,
+  
+  -- Privacy settings
+  cloud_sync_enabled BOOLEAN DEFAULT false,
+  passive_inference_enabled BOOLEAN DEFAULT true,
+  camera_proofs_allowed BOOLEAN DEFAULT false,
+  desktop_helper_allowed BOOLEAN DEFAULT false,
+  
+  -- E2E encryption
+  public_key TEXT,
+  encrypted_private_key TEXT,
+  
+  -- Onboarding
+  onboarding_completed BOOLEAN DEFAULT false,
+  avatar_choice VARCHAR(50),
+  
+  algorithm_version VARCHAR(20) DEFAULT 'v1.0'
+);
+
+-- Habits with full scheduling support
+CREATE TABLE habits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  
+  -- Basic info
+  name VARCHAR(200) NOT NULL,
+  category VARCHAR(100),
+  enabled BOOLEAN DEFAULT true,
+  
+  -- Scheduling
+  cadence_type VARCHAR(50) NOT NULL, -- daily, weekdays, n_per_week, custom
+  cadence_params JSONB DEFAULT '{}',
+  expected_days_per_week INTEGER DEFAULT 7,
+  
+  -- Timing (in seconds)
+  floor_seconds INTEGER NOT NULL DEFAULT 60,
+  min_floor_seconds INTEGER NOT NULL DEFAULT 30,
+  target_seconds INTEGER NOT NULL DEFAULT 1500,
+  stretch_seconds INTEGER NOT NULL DEFAULT 2700,
+  
+  -- Prioritization
+  priority DECIMAL(3,2) DEFAULT 0.5 CHECK (priority >= 0 AND priority <= 1),
+  keystone BOOLEAN DEFAULT false,
+  
+  -- Algorithm state
+  ema DECIMAL(5,4) DEFAULT 1.0 CHECK (ema >= 0 AND ema <= 1),
+  last_floor_raise_ts TIMESTAMP WITH TIME ZONE,
+  last_repair_ritual_ts TIMESTAMP WITH TIME ZONE,
+  
+  -- Resources
+  resource_url TEXT,
+  resource_type VARCHAR(50), -- web, app, file
+  
+  -- Privacy per habit
+  proof_mode VARCHAR(50) DEFAULT 'self_attest',
+  privacy_flags JSONB DEFAULT '{}',
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  algorithm_version VARCHAR(20) DEFAULT 'v1.0'
+);
+
+-- Session events (immutable log)
+CREATE TABLE session_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL,
+  habit_id UUID NOT NULL REFERENCES habits(id),
+  user_id UUID NOT NULL REFERENCES users(id),
+  
+  -- Timing
+  started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  floor_reached_at TIMESTAMP WITH TIME ZONE,
+  target_reached_at TIMESTAMP WITH TIME ZONE,
+  completed_at TIMESTAMP WITH TIME ZONE,
+  
+  -- Outcomes
+  duration_seconds INTEGER DEFAULT 0,
+  floor_reached BOOLEAN DEFAULT false,
+  target_reached BOOLEAN DEFAULT false,
+  stretch_reached BOOLEAN DEFAULT false,
+  
+  -- Session behavior
+  continue_prompt_shown BOOLEAN DEFAULT false,
+  continue_accepted BOOLEAN DEFAULT false,
+  early_exit_reason VARCHAR(100),
+  
+  -- Special cases
+  salvage BOOLEAN DEFAULT false,
+  repair_ritual BOOLEAN DEFAULT false,
+  
+  -- Proof data (hashed only)
+  proof_method VARCHAR(50),
+  proof_result BOOLEAN,
+  proof_metadata_hash VARCHAR(64),
+  
+  -- Context
+  device_platform VARCHAR(50),
+  device_version VARCHAR(50),
+  timezone VARCHAR(50),
+  inferred_context VARCHAR(100),
+  manual_tags JSONB DEFAULT '[]',
+  
+  -- Tokens awarded
+  tokens_awarded INTEGER DEFAULT 0,
+  
+  -- Metadata
+  algorithm_version VARCHAR(20) DEFAULT 'v1.0',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Token buckets for rewards
+CREATE TABLE token_buckets (
+  user_id UUID NOT NULL REFERENCES users(id),
+  habit_id UUID NOT NULL REFERENCES habits(id),
+  
+  current_tokens INTEGER DEFAULT 0 CHECK (current_tokens >= 0 AND current_tokens <= 4),
+  last_increment_at TIMESTAMP WITH TIME ZONE,
+  quiet_until TIMESTAMP WITH TIME ZONE,
+  
+  -- Token expiration tracking
+  token_expirations JSONB DEFAULT '[]', -- [{"count": 2, "expires_at": "2025-08-22T10:00:00Z"}]
+  
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  PRIMARY KEY (user_id, habit_id)
+);
+
+-- Floor adjustment history
+CREATE TABLE floor_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  habit_id UUID NOT NULL REFERENCES habits(id),
+  user_id UUID NOT NULL REFERENCES users(id),
+  
+  old_value_seconds INTEGER NOT NULL,
+  new_value_seconds INTEGER NOT NULL,
+  reason VARCHAR(100) NOT NULL, -- ema_raise, ema_lower, user_manual, sunday_review
+  
+  -- Algorithm state at time of change
+  ema_snapshot DECIMAL(5,4),
+  consecutive_days_data JSONB,
+  
+  -- Trigger info
+  triggered_by VARCHAR(50), -- auto, user, sunday_review
+  trigger_details JSONB,
+  
+  -- User acceptance
+  proposed_at TIMESTAMP WITH TIME ZONE,
+  accepted_at TIMESTAMP WITH TIME ZONE,
+  rejected_at TIMESTAMP WITH TIME ZONE,
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Analytics events
+CREATE TABLE analytics_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  session_id UUID, -- nullable for non-session events
+  habit_id UUID REFERENCES habits(id), -- nullable for user-level events
+  
+  event_type VARCHAR(100) NOT NULL,
+  event_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+  
+  -- Event properties (JSON for flexibility)
+  properties JSONB DEFAULT '{}',
+  
+  -- Technical metadata
+  device_platform VARCHAR(50),
+  app_version VARCHAR(20),
+  algorithm_version VARCHAR(20),
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Reward assets and unlocks
+CREATE TABLE cosmetic_assets (
+  id VARCHAR(100) PRIMARY KEY, -- e.g., "lantern_blue_v1"
+  asset_type VARCHAR(50) NOT NULL, -- cosmetic, story, soundtrack
+  category VARCHAR(50), -- tile_theme, background, sound
+  
+  -- Asset metadata
+  name VARCHAR(200),
+  description TEXT,
+  rarity VARCHAR(20) DEFAULT 'common', -- common, rare, epic
+  
+  -- Unlock requirements
+  token_cost INTEGER DEFAULT 2,
+  unlock_requirements JSONB DEFAULT '{}',
+  
+  -- Asset files
+  asset_urls JSONB, -- {"base": "url", "variants": {...}}
+  file_sizes JSONB, -- size in bytes for each variant
+  
+  -- Metadata
+  author_credit VARCHAR(200),
+  license VARCHAR(100),
+  tags JSONB DEFAULT '[]',
+  
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User unlocked cosmetics
+CREATE TABLE user_cosmetics (
+  user_id UUID NOT NULL REFERENCES users(id),
+  asset_id VARCHAR(100) NOT NULL REFERENCES cosmetic_assets(id),
+  habit_id UUID REFERENCES habits(id), -- nullable, some cosmetics are global
+  
+  unlocked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  tokens_spent INTEGER DEFAULT 0,
+  
+  -- Usage tracking
+  times_used INTEGER DEFAULT 0,
+  last_used_at TIMESTAMP WITH TIME ZONE,
+  currently_active BOOLEAN DEFAULT false,
+  
+  PRIMARY KEY (user_id, asset_id, COALESCE(habit_id, '00000000-0000-0000-0000-000000000000'::UUID))
+);
+
+-- Sunday Chapter proposals and responses
+CREATE TABLE sunday_proposals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  
+  -- Proposal metadata
+  week_start_date DATE NOT NULL,
+  generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  -- Proposed changes
+  proposals JSONB NOT NULL, -- Array of {type, habitId, currentValue, proposedValue, reason}
+  
+  -- User responses
+  responses JSONB, -- User's accept/reject/modify for each proposal
+  responded_at TIMESTAMP WITH TIME ZONE,
+  
+  -- Implementation
+  changes_applied JSONB, -- What actually got changed
+  applied_at TIMESTAMP WITH TIME ZONE
+);
+```
+
+### Performance Indexes
+
+```sql
+-- Critical query performance
+CREATE INDEX idx_sessions_habit_date ON session_events(habit_id, DATE(started_at));
+CREATE INDEX idx_sessions_user_recent ON session_events(user_id, started_at DESC) WHERE started_at > NOW() - INTERVAL '30 days';
+CREATE INDEX idx_sessions_completion_lookup ON session_events(habit_id, completed_at) WHERE completed_at IS NOT NULL;
+
+CREATE INDEX idx_habits_user_active ON habits(user_id, enabled) WHERE enabled = true;
+CREATE INDEX idx_habits_ema_monitoring ON habits(ema, updated_at) WHERE enabled = true;
+
+CREATE INDEX idx_analytics_user_event ON analytics_events(user_id, event_type, event_timestamp);
+CREATE INDEX idx_analytics_cohort_analysis ON analytics_events(event_type, event_timestamp) WHERE event_timestamp > NOW() - INTERVAL '90 days';
+
+CREATE INDEX idx_floor_history_habit ON floor_history(habit_id, created_at DESC);
+CREATE INDEX idx_proposals_user_week ON sunday_proposals(user_id, week_start_date);
+```
+
+---
+
+## 10. OFFLINE SYNCHRONIZATION & CONFLICT RESOLUTION
+
+### Offline Event Queue
+
+```typescript
+interface OfflineEvent {
+  id: string;
+  type: 'session_start' | 'session_complete' | 'token_claim' | 'setting_change';
+  timestamp: Date;
+  payload: any;
+  syncStatus: 'pending' | 'synced' | 'failed' | 'conflict';
+  retryCount: number;
+  deviceId: string;
+}
+
+class OfflineSyncManager {
+  private eventQueue: OfflineEvent[] = [];
+  
+  async queueEvent(type: string, payload: any): Promise<void> {
+    const event: OfflineEvent = {
+      id: this.generateUUID(),
+      type: type as any,
+      timestamp: new Date(),
+      payload,
+      syncStatus: 'pending',
+      retryCount: 0,
+      deviceId: await this.getDeviceId()
+    };
+    
+    this.eventQueue.push(event);
+    await this.persistQueue();
+    
+    // Try immediate sync if online
+    if (await this.isOnline()) {
+      this.syncPendingEvents();
+    }
+  }
+  
+  async syncPendingEvents(): Promise<SyncResult> {
+    const pending = this.eventQueue.filter(e => e.syncStatus === 'pending');
+    if (pending.length === 0) return { success: true, conflicts: [] };
+    
+    try {
+      const response = await this.api.batchSync({
+        device_id: await this.getDeviceId(),
+        events: pending.map(e => ({
+          client_id: e.id,
+          type: e.type,
+          timestamp: e.timestamp.toISOString(),
+          payload: e.payload
+        }))
+      });
+      
+      // Process successful syncs
+      for (const success of response.successful) {
+        const event = pending.find(e => e.id === success.client_id);
+        if (event) {
+          event.syncStatus = 'synced';
+        }
+      }
+      
+      // Handle conflicts
+      const conflicts: ConflictResolution[] = [];
+      for (const conflict of response.conflicts) {
+        const resolution = await this.resolveConflict(conflict);
+        conflicts.push(resolution);
+      }
+      
+      await this.persistQueue();
+      return { success: true, conflicts };
+      
+    } catch (error) {
+      // Mark events as failed for retry
+      pending.forEach(event => {
+        event.retryCount++;
+        if (event.retryCount > 3) {
+          event.syncStatus = 'failed';
+        }
+      });
+      
+      await this.persistQueue();
+      throw error;
+    }
+  }
+  
+  private async resolveConflict(conflict: SyncConflict): Promise<ConflictResolution> {
+    switch (conflict.type) {
+      case 'session_overlap':
+        return this.resolveSessionOverlap(conflict);
+      case 'token_mismatch':
+        return this.resolveTokenMismatch(conflict);
+      case 'setting_conflict':
+        return this.resolveSettingConflict(conflict);
+      default:
+        return { resolution: 'server_wins', reason: 'unknown_conflict_type' };
+    }
+  }
+  
+  private async resolveSessionOverlap(conflict: SyncConflict): Promise<ConflictResolution> {
+    const localSession = conflict.local_data;
+    const serverSession = conflict.server_data;
+    
+    // If sessions are within 5 minutes, likely same session from different devices
+    const timeDiff = Math.abs(
+      new Date(localSession.started_at).getTime() - 
+      new Date(serverSession.started_at).getTime()
+    );
+    
+    if (timeDiff < 5 * 60 * 1000) {
+      // Merge sessions, prefer longer duration
+      return {
+        resolution: 'merge',
+        merged_data: {
+          ...serverSession,
+          duration_seconds: Math.max(localSession.duration_seconds, serverSession.duration_seconds),
+          floor_reached: localSession.floor_reached || serverSession.floor_reached,
+          target_reached: localSession.target_reached || serverSession.target_reached
+        }
+      };
+    }
+    
+    // Different sessions, keep both
+    return { resolution: 'keep_both', reason: 'distinct_sessions' };
+  }
+}
+```
+
+### Cross-Device Timer State
+
+```typescript
+interface TimerState {
+  sessionId: string;
+  habitId: string;
+  startedAt: Date;
+  floorSeconds: number;
+  currentPhase: 'floor' | 'target' | 'stretch';
+  elapsedSeconds: number;
+  deviceId: string;
+  lastHeartbeat: Date;
+}
+
+class CrossDeviceTimerManager {
+  async startSession(habitId: string): Promise<TimerState> {
+    // Check for existing active sessions
+    const activeSession = await this.checkActiveSession(habitId);
+    
+    if (activeSession && this.isSessionActive(activeSession)) {
+      // Prompt user about existing session
+      const userChoice = await this.promptConcurrentSession(activeSession);
+      
+      switch (userChoice) {
+        case 'continue_existing':
+          return this.resumeSession(activeSession);
+        case 'start_new':
+          await this.endSession(activeSession.sessionId);
+          break;
+        case 'cancel':
+          throw new UserCancelledError();
+      }
+    }
+    
+    // Start new session
+    const newSession: TimerState = {
+      sessionId: this.generateUUID(),
+      habitId,
+      startedAt: new Date(),
+      floorSeconds: await this.getFloorSeconds(habitId),
+      currentPhase: 'floor',
+      elapsedSeconds: 0,
+      deviceId: await this.getDeviceId(),
+      lastHeartbeat: new Date()
+    };
+    
+    await this.persistTimerState(newSession);
+    await this.startHeartbeat(newSession.sessionId);
+    
+    return newSession;
+  }
+  
+  private isSessionActive(session: TimerState): boolean {
+    const heartbeatAge = Date.now() - session.lastHeartbeat.getTime();
+    return heartbeatAge < 5 * 60 * 1000; // 5 minutes
+  }
+  
+  private async startHeartbeat(sessionId: string): Promise<void> {
+    this.heartbeatIntervals.set(sessionId, setInterval(async () => {
+      await this.updateHeartbeat(sessionId);
+    }, 30 * 1000)); // 30 second heartbeat
+  }
+}
+```
+
+---
+
+## 11. PRIVACY & PROOF SYSTEM
+
+### Privacy-First Proof Architecture
+
+```typescript
+interface ProofConfig {
+  method: 'self_attest' | 'app_foreground' | 'photo_hash' | 'wearable_hr';
+  enabled: boolean;
+  retention_hours: number; // 24-72 hours max
+  upload_consent: boolean;
+}
+
+class ProofManager {
+  async generateProof(method: string, sessionId: string): Promise<ProofResult> {
+    switch (method) {
+      case 'self_attest':
+        return this.selfAttestProof();
+      
+      case 'app_foreground':
+        return this.appForegroundProof(sessionId);
+      
+      case 'photo_hash':
+        return this.photoHashProof();
+      
+      case 'wearable_hr':
+        return this.wearableHRProof(sessionId);
+      
+      default:
+        throw new UnsupportedProofMethodError(method);
+    }
+  }
+  
+  private async photoHashProof(): Promise<ProofResult> {
+    if (!await this.hasPermission('camera')) {
+      throw new PermissionDeniedError('Camera permission required');
+    }
+    
+    // Show clear consent dialog
+    const consent = await this.showProofConsentDialog({
+      title: 'Photo Proof',
+      message: 'Take a quick photo as proof. The image will be processed locally and only a hash will be stored for 24 hours.',
+      permissions: ['camera'],
+      retention: '24 hours',
+      privacy_note: 'The actual photo is never uploaded or stored permanently.'
+    });
+    
+    if (!consent) {
+      throw new UserDeclinedError();
+    }
+    
+    try {
+      const imageData = await this.capturePhoto();
+      const hash = await this.hashImage(imageData);
+      
+      // Store hash locally with expiration
+      await this.storeProofHash(hash, Date.now() + 24 * 60 * 60 * 1000);
+      
+      // Immediately delete image data
+      imageData.dispose();
+      
+      return {
+        method: 'photo_hash',
+        result: true,
+        metadata_hash: hash,
+        timestamp: new Date()
+      };
+      
+    } catch (error) {
+      return {
+        method: 'photo_hash',
+        result: false,
+        error: error.message,
+        timestamp: new Date()
+      };
+    }
+  }
+  
+  private async hashImage(imageData: ImageData): Promise<string> {
+    // Use perceptual hashing to detect similar images while protecting privacy
+    const features = await this.extractImageFeatures(imageData);
+    return this.cryptoHash(features.join(''));
+  }
+  
+  private async storeProofHash(hash: string, expiresAt: number): Promise<void> {
+    const proofData = {
+      hash,
+      created_at: Date.now(),
+      expires_at: expiresAt
+    };
+    
+    await this.localDB.store('proof_hashes', hash, proofData);
+    
+    // Schedule cleanup
+    setTimeout(() => {
+      this.localDB.delete('proof_hashes', hash);
+    }, expiresAt - Date.now());
+  }
+}
+
+// Privacy settings enforcement
+class PrivacyManager {
+  async enforcePrivacySettings(userId: string, action: string): Promise<boolean> {
+    const settings = await this.getUserPrivacySettings(userId);
+    
+    switch (action) {
+      case 'camera_proof':
+        return settings.camera_proofs_allowed;
+      
+      case 'desktop_helper':
+        return settings.desktop_helper_allowed;
+      
+      case 'cloud_sync':
+        return settings.cloud_sync_enabled;
+      
+      case 'passive_inference':
+        return settings.passive_inference_enabled;
+      
+      default:
+        return false; // Deny by default for unknown actions
+    }
+  }
+  
+  async showPrivacyConsentDialog(request: PrivacyRequest): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.ui.showDialog({
+        title: `${request.feature} Permission`,
+        content: this.generateConsentContent(request),
+        buttons: [
+          {
+            text: 'Allow',
+            style: 'primary',
+            onPress: () => {
+              this.logConsentGiven(request);
+              resolve(true);
+            }
+          },
+          {
+            text: 'Not Now',
+            style: 'secondary',
+            onPress: () => {
+              this.logConsentDenied(request);
+              resolve(false);
+            }
+          }
+        ]
+      });
+    });
+  }
+}
+```
+
+### Desktop Helper (Optional Component)
+
+```typescript
+// Electron-based desktop helper for window monitoring
+class DesktopHelper {
+  private activeWindowPoller: NodeJS.Timer | null = null;
+  private hashedTitleCache: Map<string, string> = new Map();
+  
+  async startWindowMonitoring(sessionId: string): Promise<void> {
+    if (!await this.hasPermission('accessibility')) {
+      throw new PermissionError('Accessibility permission required');
+    }
+    
+    this.activeWindowPoller = setInterval(async () => {
+      const windowTitle = await this.getActiveWindowTitle();
+      const hashedTitle = this.hashWindowTitle(windowTitle);
+      
+      await this.reportWindowActivity(sessionId, hashedTitle);
+    }, 5000); // Check every 5 seconds
+  }
+  
+  private async getActiveWindowTitle(): Promise<string> {
+    // Platform-specific implementation
+    if (process.platform === 'darwin') {
+      return this.getMacActiveWindow();
+    } else if (process.platform === 'win32') {
+      return this.getWindowsActiveWindow();
+    } else {
+      return this.getLinuxActiveWindow();
+    }
+  }
+  
+  private hashWindowTitle(title: string): string {
+    // Cache hashes to avoid recomputing
+    if (this.hashedTitleCache.has(title)) {
+      return this.hashedTitleCache.get(title)!;
+    }
+    
+    const hash = crypto.createHash('sha256').update(title).digest('hex');
+    this.hashedTitleCache.set(title, hash);
+    
+    return hash;
+  }
+  
+  private async reportWindowActivity(sessionId: string, hashedTitle: string): Promise<void> {
+    // Only report if user consented to upload
+    const uploadConsent = await this.getUserUploadConsent();
+    
+    if (uploadConsent) {
+      await this.api.reportProofActivity({
+        session_id: sessionId,
+        proof_type: 'desktop_window',
+        activity_hash: hashedTitle,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      // Store locally only
+      await this.localDB.store('window_activity', {
+        session_id: sessionId,
+        activity_hash: hashedTitle,
+        timestamp: Date.now()
+      });
+    }
+  }
+}
+```
+
+---
+
+## 12. PLATFORM-SPECIFIC IMPLEMENTATIONS
+
+### iOS Specific Features
+
+```swift
+// Focus API integration for DND
+import Intents
+import IntentsUI
+
+class FocusManager {
+    func enableDND() async throws {
+        let intent = SetFocusStatusIntent()
+        intent.status = .focused
+        intent.focusMode = .doNotDisturb
+        
+        do {
+            _ = try await intent.perform()
+        } catch {
+            // Fallback to user prompt if automatic failed
+            await promptUserForDND()
+        }
+    }
+    
+    private func promptUserForDND() async {
+        let alert = UIAlertController(
+            title: "Enable Do Not Disturb?",
+            message: "This helps you focus during your habit session.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Enable", style: .default) { _ in
+            // Open Settings to DND
+            UIApplication.shared.open(URL(string: "prefs:root=DO_NOT_DISTURB")!)
+        })
+        
+        alert.addAction(UIAlertAction(title: "Skip", style: .cancel))
+        
+        await MainActor.run {
+            self.presentingViewController?.present(alert, animated: true)
+        }
+    }
+}
+
+// Live Activities for timer display
+import ActivityKit
+
+@available(iOS 16.1, *)
+class TimerLiveActivity {
+    func startTimerActivity(session: SessionData) throws {
+        let attributes = TimerAttributes(habitName: session.habitName)
+        let contentState = TimerAttributes.ContentState(
+            remainingSeconds: session.floorSeconds,
+            phase: .floor,
+            startedAt: session.startedAt
+        )
+        
+        let content = ActivityContent(state: contentState, staleDate: nil)
+        
+        try Activity<TimerAttributes>.request(
+            attributes: attributes,
+            content: content,
+            pushType: nil
+        )
+    }
+    
+    func updateTimerActivity(to newState: TimerAttributes.ContentState) {
+        Task {
+            for activity in Activity<TimerAttributes>.activities {
+                await activity.update(
+                    ActivityContent(state: newState, staleDate: nil),
+                    alertConfiguration: nil
+                )
+            }
+        }
+    }
+}
+```
+
+### Android Specific Features
+
+```kotlin
+// Foreground service for timer reliability
+class TimerForegroundService : Service() {
+    private val notificationId = 1001
+    private var timerJob: Job? = null
+    
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val sessionData = intent?.getParcelableExtra<SessionData>("session")
+        sessionData?.let { startTimer(it) }
+        
+        return START_STICKY // Restart if killed by system
+    }
+    
+    private fun startTimer(session: SessionData) {
+        createNotificationChannel()
+        startForeground(notificationId, createTimerNotification(session))
+        
+        timerJob = CoroutineScope(Dispatchers.Main).launch {
+            while (session.remainingSeconds > 0) {
+                delay(1000)
+                session.remainingSeconds--
+                updateNotification(session)
+                
+                if (session.remainingSeconds == 0) {
+                    onTimerComplete(session)
+                    break
+                }
+            }
+        }
+    }
+    
+    private fun createTimerNotification(session: SessionData): Notification {
+        return NotificationCompat.Builder(this, TIMER_CHANNEL_ID)
+            .setContentTitle("${session.habitName} - Floor Timer")
+            .setContentText("${session.remainingSeconds}s remaining")
+            .setSmallIcon(R.drawable.ic_timer)
+            .setOngoing(true)
+            .setProgress(session.floorSeconds, session.remainingSeconds, false)
+            .build()
+    }
+    
+    // DND integration
+    private fun enableDND() {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (notificationManager.isNotificationPolicyAccessGranted) {
+                notificationManager.setInterruptionFilter(
+                    NotificationManager.INTERRUPTION_FILTER_NONE
+                )
+            } else {
+                // Prompt user for permission
+                val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                startActivity(intent)
+            }
+        }
+    }
+}
+
+// Accessibility service for app blocking (with explicit permission)
+class AppBlockingAccessibilityService : AccessibilityService() {
+    private var blockedApps: Set<String> = emptySet()
+    private var blockingActive = false
+    
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (!blockingActive) return
+        
+        val packageName = event.packageName?.toString()
+        if (packageName in blockedApps) {
+            // Show overlay with option to continue with explicit confirmation
+            showUnblockOverlay(packageName)
+        }
+    }
+    
+    private fun showUnblockOverlay(blockedApp: String) {
+        val overlay = LayoutInflater.from(this).inflate(R.layout.unblock_overlay, null)
+        val holdButton = overlay.findViewById<View>(R.id.hold_to_unblock)
+        
+        // Require 3-second hold + typed reason
+        holdButton.setOnLongClickListener {
+            showReasonDialog(blockedApp)
+            true
+        }
+        
+        windowManager.addView(overlay, createOverlayParams())
+    }
+}
+```
+
+---
+
+## 13. TESTING & QA SPECIFICATIONS
+
+### Automated Test Suites
+
+```typescript
+// Unit tests for core algorithms
+describe('CadenceScoring', () => {
+  test('calculates daily habit score correctly', () => {
+    const sessions = [
+      { date: '2025-08-15', floor_reached: true },
+      { date: '2025-08-16', floor_reached: false },
+      { date: '2025-08-17', floor_reached: true }
+    ];
+    
+    const score = calculateCadenceScore(sessions, 'daily', 3);
+    expect(score).toBe(2/3); // 2 completions out of 3 expected days
+  });
+  
+  test('handles salvage cap correctly', () => {
+    const sessions = [
+      { date: '2025-08-15', salvage: true },
+      { date: '2025-08-16', salvage: true }, // 2nd salvage, should count
+      { date: '2025-08-17', salvage: true }  // 3rd salvage, should NOT count
+    ];
+    
+    const score = calculateSalvageAdjustedScore(sessions);
+    expect(score.counted_salvages).toBe(2);
+  });
+});
+
+describe('EMAFloorAdjustment', () => {
+  test('suggests floor increase after consistent high performance', () => {
+    const habitData = {
+      ema: 0.95,
+      floor_seconds: 60,
+      target_seconds: 1500,
+      consecutive_high_days: 7
+    };
+    
+    const adjustment = evaluateFloorAdjustment(habitData);
+    expect(adjustment.suggested_floor).toBe(63); // 60 * 1.05
+    expect(adjustment.reason).toBe('ema_raise');
+  });
+  
+  test('respects cooldown periods', () => {
+    const habitData = {
+      ema: 0.95,
+      consecutive_high_days: 7,
+      last_repair_ritual_ts: new Date(Date.now() - 48 * 60 * 60 * 1000) // 48 hours ago
+    };
+    
+    const adjustment = evaluateFloorAdjustment(habitData);
+    expect(adjustment).toBeNull(); // Should not raise due to recent repair
+  });
+});
+
+// Integration tests for session flow
+describe('SessionFlow', () => {
+  test('complete start-to-finish session with token award', async () => {
+    const habitId = 'test-habit-id';
+    const userId = 'test-user-id';
+    
+    // Start session
+    const startResponse = await api.post('/sessions/start', { habit_id: habitId });
+    expect(startResponse.status).toBe(200);
+    
+    // Simulate floor completion
+    const floorResponse = await api.post(`/sessions/${startResponse.data.session_id}/floor_reached`, {
+      duration_seconds: 65
+    });
+    expect(floorResponse.data.tokens_awarded).toBe(1);
+    
+    // Complete session
+    const completeResponse = await api.post(`/sessions/${startResponse.data.session_id}/complete`, {
+      total_duration_seconds: 1800,
+      target_reached: true
+    });
+    
+    expect(completeResponse.status).toBe(200);
+    
+    // Verify token bucket updated
+    const tokenBucket = await db.getTokenBucket(userId, habitId);
+    expect(tokenBucket.current_tokens).toBe(1);
+  });
+  
+  test('handles offline session sync correctly', async () => {
+    // Simulate offline session
+    const offlineSession = {
+      id: 'offline-session-1',
+      habit_id: 'test-habit',
+      started_at: new Date().toISOString(),
+      duration_seconds: 120,
+      floor_reached: true
+    };
+    
+    await offlineDB.storeSession(offlineSession);
+    
+    // Sync when back online
+    const syncResult = await syncManager.syncPendingEvents();
+    expect(syncResult.success).toBe(true);
+    
+    // Verify session appears in server
+    const serverSession = await api.get(`/sessions/${offlineSession.id}`);
+    expect(serverSession.data.duration_seconds).toBe(120);
+  });
+});
+
+// End-to-end tests
+describe('E2E UserJourney', () => {
+  test('complete onboarding to first habit completion', async () => {
+    const page = await browser.newPage();
+    
+    // Onboarding flow
+    await page.goto('/onboarding');
+    await page.click('[data-testid="avatar-2"]'); // 8s
+    await page.click('[data-testid="habit-reading"]'); // Select habit
+    await page.click('[data-testid="preset-floor-60s"]'); // 25s total
+    await page.click('[data-testid="bedtime-default"]'); // 6s
+    await page.waitForSelector('[data-testid="demo-animation"]'); // 10s
+    
+    // First session
+    await page.click('[data-testid="try-now-button"]');
+    await page.waitForSelector('[data-testid="timer-running"]');
+    
+    // Wait for floor completion (mock timer for test speed)
+    await page.evaluate(() => window.mockTimerComplete());
+    await page.waitForSelector('[data-testid="floor-reached-animation"]');
+    
+    // Verify token awarded
+    const tokenCount = await page.textContent('[data-testid="token-count"]');
+    expect(tokenCount).toBe('1');
+    
+    // Complete session
+    await page.click('[data-testid="complete-session"]');
+    await page.waitForSelector('[data-testid="completion-screen"]');
+    
+    expect(await page.screenshot()).toMatchSnapshot('first-completion.png');
+  });
+});
+```
+
+### Performance Benchmarks
+
+```typescript
+describe('Performance', () => {
+  test('session start latency under 500ms', async () => {
+    const startTime = Date.now();
+    
+    const response = await api.post('/sessions/start', {
+      habit_id: 'test-habit'
+    });
+    
+    const latency = Date.now() - startTime;
+    expect(latency).toBeLessThan(500);
+    expect(response.status).toBe(200);
+  });
+  
+  test('EMA batch job processes 1000 habits under 30s', async () => {
+    // Create test data
+    await db.createTestHabits(1000);
+    await db.createTestSessions(10000); // 10 sessions per habit
+    
+    const startTime = Date.now();
+    await emaProcessor.processNightlyBatch();
+    const duration = Date.now() - startTime;
+    
+    expect(duration).toBeLessThan(30000); // 30 seconds
+  });
+  
+  test('mobile app startup time under 2s', async () => {
+    const app = await device.launchApp({ newInstance: true });
+    
+    const startTime = Date.now();
+    await element(by.id('home-screen')).waitToBeVisible();
+    const startupTime = Date.now() - startTime;
+    
+    expect(startupTime).toBeLessThan(2000);
+  });
+});
+```
+
+### Privacy & Security Tests
+
+```typescript
+describe('Privacy', () => {
+  test('no camera data uploaded without explicit consent', async () => {
+    const networkSpy = jest.spyOn(api, 'post');
+    
+    // Enable camera proofs but don't consent to upload
+    await settings.enableCameraProofs(true);
+    await settings.setUploadConsent(false);
+    
+    // Take proof photo
+    await proofManager.generateProof('photo_hash', 'test-session');
+    
+    // Verify no image data in any network calls
+    networkSpy.mock.calls.forEach(call => {
+      expect(call[1]).not.toContain('image_data');
+      expect(call[1]).not.toContain('photo_blob');
+    });
+  });
+  
+  test('proof hashes expire after 24 hours', async ()

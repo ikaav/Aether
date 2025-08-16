@@ -1,0 +1,759 @@
+{
+  "components": [
+    {
+      "id": "ScreenShell",
+      "file_name": "mobile/app/components/ScreenShell.tsx",
+      "description": "Safe-area aware screen container with optional header/footer slots and status bar styling.",
+      "props": {
+        "children": "React.ReactNode",
+        "statusBarStyle": "'light' | 'dark'",
+        "header": "React.ReactNode | null",
+        "footer": "React.ReactNode | null",
+        "backgroundColor": "string",
+        "scroll": "boolean"
+      },
+      "required_props": ["children"],
+      "accessibility_notes": [
+        "Use accessibilityRole='summary' on header container when header is present",
+        "Ensure content container has importantForAccessibility='yes' and respects prefers-reduced-motion"
+      ],
+      "implementation_notes": "Wrap in SafeAreaView; when scroll=true, render ScrollView with keyboardShouldPersistTaps='handled'.",
+      "usage_examples": [
+        "<ScreenShell statusBarStyle='light' header={<AppHeader ... />} footer={<BottomActionsBar ... />}>{children}</ScreenShell>"
+      ]
+    },
+    {
+      "id": "AppHeader",
+      "file_name": "mobile/app/components/AppHeader.tsx",
+      "description": "Top header with date display and optional consistency ring.",
+      "props": {
+        "dateDisplay": "string",
+        "showConsistencyRing": "boolean",
+        "ringPercentage": "number",
+        "ringLabel": "string",
+        "onRingPress": "() => void"
+      },
+      "required_props": ["dateDisplay"],
+      "accessibility_notes": [
+        "Header container role='header' (accessibilityRole='header')",
+        "Ring is a button with accessibilityRole='button' and accessibilityLabel including percentage"
+      ],
+      "implementation_notes": "Compose with ConsistencyRing; use Pressable for onRingPress; announce updates via AccessibilityInfo.announceForAccessibility.",
+      "usage_examples": [
+        "<AppHeader dateDisplay='Friday, August 15' showConsistencyRing ringPercentage={80} ringLabel='4 of 5 habits this week' onRingPress={navToSunday} />"
+      ]
+    },
+    {
+      "id": "ConsistencyRing",
+      "file_name": "mobile/app/components/ConsistencyRing.tsx",
+      "description": "Circular progress ring with optional center label.",
+      "props": {
+        "percentage": "number",
+        "size": "number",
+        "strokeWidth": "number",
+        "color": "string",
+        "backgroundColor": "string",
+        "label": "string | null"
+      },
+      "required_props": ["percentage"],
+      "accessibility_notes": [
+        "Set accessibilityRole='image' with accessibilityLabel `${percentage}% consistency`"
+      ],
+      "implementation_notes": "Use react-native-svg Circle with strokeDashoffset; respects reduced motion by disabling ringPulse animation.",
+      "usage_examples": [
+        "<ConsistencyRing percentage={72} size={96} strokeWidth={8} color='#0E6B4A' backgroundColor='rgba(255,255,255,0.1)' label='4/5' />"
+      ]
+    },
+    {
+      "id": "HabitCard",
+      "file_name": "mobile/app/components/HabitCard.tsx",
+      "description": "Card representing a habit with title, start button, context hint, and progress state.",
+      "props": {
+        "habitId": "string",
+        "title": "string",
+        "state": "'ready' | 'running' | 'completed'",
+        "todayProgress": "'none' | 'floor' | 'target' | 'stretch'",
+        "contextHint": "string | null",
+        "nextScheduled": "string | null",
+        "onStart": "() => Promise<void>",
+        "onOpen": "() => void"
+      },
+      "required_props": ["habitId", "title", "state", "todayProgress", "onStart"],
+      "accessibility_notes": [
+        "Entire card is Pressable with accessibilityRole='button' and label `${title}, ${todayProgress} today`",
+        "Start button child has accessibilityHint 'Starts a session'"
+      ],
+      "implementation_notes": "Use StartButton inside; reflect state via tokens colors; include token bucket badge position top-right.",
+      "usage_examples": [
+        "<HabitCard habitId='h1' title='Morning Pages' state='ready' todayProgress='none' contextHint='Best time: mornings' onStart={start} onOpen={openDetails} />"
+      ]
+    },
+    {
+      "id": "StartButton",
+      "file_name": "mobile/app/components/StartButton.tsx",
+      "description": "Large circular start button that animates press and progress when running.",
+      "props": {
+        "size": "number",
+        "state": "'ready' | 'running' | 'completed'",
+        "onPress": "() => void",
+        "testID": "string | undefined"
+      },
+      "required_props": ["state", "onPress"],
+      "accessibility_notes": [
+        "accessibilityRole='button'",
+        "When state changes to 'completed', announce 'Session completed'"
+      ],
+      "implementation_notes": "Animate scale on press (button_press); show checkmark when completed.",
+      "usage_examples": [
+        "<StartButton size={64} state='ready' onPress={handleStart} />"
+      ]
+    },
+    {
+      "id": "BottomActionsBar",
+      "file_name": "mobile/app/components/BottomActionsBar.tsx",
+      "description": "Bottom action bar with queue, add habit, and settings icons.",
+      "props": {
+        "queueBadgeCount": "number",
+        "onQueuePress": "() => void",
+        "onAddHabitPress": "() => void",
+        "onSettingsPress": "() => void",
+        "showAddHabit": "boolean"
+      },
+      "required_props": ["queueBadgeCount", "onQueuePress", "onSettingsPress"],
+      "accessibility_notes": [
+        "Each icon is a button with accessible labels: 'Open queue', 'Add habit', 'Open settings'"
+      ],
+      "implementation_notes": "Use HStack with spacing tokens; apply elevation/shadow tokens.",
+      "usage_examples": [
+        "<BottomActionsBar queueBadgeCount={2} onQueuePress={openQueue} onAddHabitPress={addHabit} onSettingsPress={openSettings} showAddHabit />"
+      ]
+    },
+    {
+      "id": "TimerCircularProgress",
+      "file_name": "mobile/app/components/TimerCircularProgress.tsx",
+      "description": "Circular timer showing elapsed/remaining time and phase color.",
+      "props": {
+        "progress": "number",
+        "size": "number",
+        "strokeWidth": "number",
+        "phase": "'floor' | 'target' | 'stretch'",
+        "onComplete": "() => void"
+      },
+      "required_props": ["progress", "phase"],
+      "accessibility_notes": [
+        "Announce 'Floor complete' when progress reaches 1.0 during floor phase"
+      ],
+      "implementation_notes": "Use react-native-reanimated for smooth progress; color map via semantic tokens.",
+      "usage_examples": [
+        "<TimerCircularProgress progress={0.5} size={220} strokeWidth={10} phase='floor' onComplete={handleFloor} />"
+      ]
+    },
+    {
+      "id": "TimeRemainingLabel",
+      "file_name": "mobile/app/components/TimeRemainingLabel.tsx",
+      "description": "Large numeric time remaining label with tabular figures.",
+      "props": {
+        "secondsRemaining": "number"
+      },
+      "required_props": ["secondsRemaining"],
+      "accessibility_notes": [
+        "Use accessibilityLiveRegion='polite' with updates throttled to once per 5s to reduce verbosity"
+      ],
+      "implementation_notes": "Use text-numeric token class; format mm:ss.",
+      "usage_examples": [
+        "<TimeRemainingLabel secondsRemaining={180} />"
+      ]
+    },
+    {
+      "id": "ContinueButton",
+      "file_name": "mobile/app/components/ContinueButton.tsx",
+      "description": "Primary button prompting to continue to target after floor.",
+      "props": {
+        "visible": "boolean",
+        "onPress": "() => void",
+        "label": "string"
+      },
+      "required_props": ["visible", "onPress", "label"],
+      "accessibility_notes": [
+        "accessibilityRole='button' with hint 'Continues timer to target'"
+      ],
+      "implementation_notes": "Fade/slide in using micro-interaction fade_slide; haptic on press.",
+      "usage_examples": [
+        "{floorReached && <ContinueButton visible onPress={handleContinue} label='Continue to Target' />}"
+      ]
+    },
+    {
+      "id": "CancelHoldButton",
+      "file_name": "mobile/app/components/CancelHoldButton.tsx",
+      "description": "Destructive action requiring long-press to cancel session.",
+      "props": {
+        "onLongPress": "() => void",
+        "holdMillis": "number",
+        "label": "string"
+      },
+      "required_props": ["onLongPress"],
+      "accessibility_notes": [
+        "Describe hold duration in accessibilityHint; provide alternative double-confirm dialog for switch users"
+      ],
+      "implementation_notes": "Use Pressable with onLongPress and delayLongPress=holdMillis; show radial progress affordance.",
+      "usage_examples": [
+        "<CancelHoldButton label='Hold to Cancel' holdMillis={2000} onLongPress={cancel} />"
+      ]
+    },
+    {
+      "id": "TokenBucketIcon",
+      "file_name": "mobile/app/components/TokenBucketIcon.tsx",
+      "description": "Token bucket indicator with count and glow on increment.",
+      "props": {
+        "count": "number",
+        "capacity": "number",
+        "onPress": "() => void | undefined"
+      },
+      "required_props": ["count", "capacity"],
+      "accessibility_notes": [
+        "Label as `${count} of ${capacity} tokens`"
+      ],
+      "implementation_notes": "Play token_award animation on increment; bounce/glow specs included.",
+      "usage_examples": [
+        "<TokenBucketIcon count={2} capacity={4} onPress={openRewards} />"
+      ]
+    },
+    {
+      "id": "AvatarGrid",
+      "file_name": "mobile/app/components/onboarding/AvatarGrid.tsx",
+      "description": "Avatar selection grid with 12 options.",
+      "props": {
+        "avatars": "Array<{ id: string; uri: string; alt: string }>",
+        "selectedId": "string | null",
+        "onSelect": "(id: string) => void"
+      },
+      "required_props": ["avatars", "onSelect"],
+      "accessibility_notes": [
+        "Each avatar is a button with label from alt text; reflect selected via accessibilityState={{ selected: true }}"
+      ],
+      "implementation_notes": "3-column grid; ensure 44pt min targets; support focus outline.",
+      "usage_examples": [
+        "<AvatarGrid avatars={data} selectedId={sel} onSelect={setSel} />"
+      ]
+    },
+    {
+      "id": "HabitPresetSelector",
+      "file_name": "mobile/app/components/onboarding/HabitPresetSelector.tsx",
+      "description": "Preset selector for Floor/Target/Stretch with quick edit.",
+      "props": {
+        "floorSeconds": "number",
+        "targetSeconds": "number",
+        "stretchSeconds": "number",
+        "onChange": "(next: { floorSeconds: number; targetSeconds: number; stretchSeconds: number }) => void"
+      },
+      "required_props": ["floorSeconds", "targetSeconds", "stretchSeconds", "onChange"],
+      "accessibility_notes": [
+        "Group has role='radiogroup' with options descriptive; provide numeric input alternative for screen readers"
+      ],
+      "implementation_notes": "Show three options with edit icons; long-press shows explanation tooltip.",
+      "usage_examples": [
+        "<HabitPresetSelector floorSeconds={60} targetSeconds={300} stretchSeconds={600} onChange={setPreset} />"
+      ]
+    },
+    {
+      "id": "QuietHoursSlider",
+      "file_name": "mobile/app/components/onboarding/QuietHoursSlider.tsx",
+      "description": "Dual-handle slider for quiet hours with default 22:00-07:00.",
+      "props": {
+        "start": "string",
+        "end": "string",
+        "onChange": "(next: { start: string; end: string }) => void"
+      },
+      "required_props": ["start", "end", "onChange"],
+      "accessibility_notes": [
+        "Ensure handles are reachable with screen reader; provide text inputs fallback"
+      ],
+      "implementation_notes": "Snap to 15-minute increments; enforce start != end; reflect sleep protection policy copy.",
+      "usage_examples": [
+        "<QuietHoursSlider start='22:00' end='07:00' onChange={setQuiet} />"
+      ]
+    },
+    {
+      "id": "DemoTileAnimation",
+      "file_name": "mobile/app/components/onboarding/DemoTileAnimation.tsx",
+      "description": "Shows tile lighting up animation after sample completion.",
+      "props": {
+        "playing": "boolean"
+      },
+      "required_props": ["playing"],
+      "accessibility_notes": [
+        "Mark as decorative when playing (accessibleElementsHidden) and provide caption text outside"
+      ],
+      "implementation_notes": "Use Lottie or Reanimated; keep 10s loop with reduced motion fallback static frame.",
+      "usage_examples": [
+        "<DemoTileAnimation playing />"
+      ]
+    },
+    {
+      "id": "TryNowButton",
+      "file_name": "mobile/app/components/onboarding/TryNowButton.tsx",
+      "description": "CTA to start first 60s floor session.",
+      "props": {
+        "onPress": "() => void",
+        "testID": "string | undefined"
+      },
+      "required_props": ["onPress"],
+      "accessibility_notes": [
+        "Primary role button; announce 'Starts trial session'"
+      ],
+      "implementation_notes": "Use accent color; add countdown tooltip if needed.",
+      "usage_examples": [
+        "<TryNowButton onPress={startTrial} />"
+      ]
+    },
+    {
+      "id": "SettingsList",
+      "file_name": "mobile/app/components/settings/SettingsList.tsx",
+      "description": "Generic settings list with switches and navigations.",
+      "props": {
+        "items": "Array<{ key: string; title: string; subtitle?: string; type: 'switch' | 'link'; value?: boolean; onPress?: () => void; onValueChange?: (v: boolean) => void } >"
+      },
+      "required_props": ["items"],
+      "accessibility_notes": [
+        "Each row has role appropriate to type; provide value text for switches"
+      ],
+      "implementation_notes": "Use SectionList; apply large hit targets.",
+      "usage_examples": [
+        "<SettingsList items={[{ key: 'privacy', title: 'Privacy', type: 'link', onPress: openPrivacy }]} />"
+      ]
+    },
+    {
+      "id": "PrivacyConsentDialog",
+      "file_name": "mobile/app/components/privacy/PrivacyConsentDialog.tsx",
+      "description": "Modal dialog for explicit consent with two-button choice.",
+      "props": {
+        "visible": "boolean",
+        "title": "string",
+        "message": "string",
+        "permissions": "string[]",
+        "retention": "string",
+        "onAllow": "() => void",
+        "onDeny": "() => void"
+      },
+      "required_props": ["visible", "title", "message", "onAllow", "onDeny"],
+      "accessibility_notes": [
+        "Modal uses accessibilityViewIsModal and focuses first heading; trap focus until action"
+      ],
+      "implementation_notes": "Sheet style modal with two actions; do not proceed without choice.",
+      "usage_examples": [
+        "<PrivacyConsentDialog visible title='Photo Proof' message='Processed locally, only a hash stored for 24h.' permissions={['camera']} retention='24 hours' onAllow={allow} onDeny={deny} />"
+      ]
+    },
+    {
+      "id": "UnlockModal",
+      "file_name": "mobile/app/components/rewards/UnlockModal.tsx",
+      "description": "Displays unlocks triggered after token awards.",
+      "props": {
+        "visible": "boolean",
+        "unlocks": "Array<{ type: 'cosmetic' | 'story' | 'soundtrack'; assetId: string; name?: string; description?: string }>",
+        "onClose": "() => void"
+      },
+      "required_props": ["visible", "unlocks", "onClose"],
+      "accessibility_notes": [
+        "Announce list length and each item; provide close button with label 'Close unlocks'"
+      ],
+      "implementation_notes": "Trigger after token_award animation completion; animate sheet_open.",
+      "usage_examples": [
+        "<UnlockModal visible unlocks={[{ type: 'cosmetic', assetId: 'lantern_blue', name: 'Lantern Blue' }]} onClose={close} />"
+      ]
+    },
+    {
+      "id": "Toast",
+      "file_name": "mobile/app/components/feedback/Toast.tsx",
+      "description": "Transient message banner for success/warning/info.",
+      "props": {
+        "type": "'success' | 'warning' | 'info'",
+        "message": "string",
+        "durationMs": "number"
+      },
+      "required_props": ["type", "message"],
+      "accessibility_notes": [
+        "Use accessibilityLiveRegion='polite'; keep durations accessible (>= 3s) or user dismissible"
+      ],
+      "implementation_notes": "Slide/fade in from top; color by semantic tokens.",
+      "usage_examples": [
+        "<Toast type='success' message='Saved' durationMs={3000} />"
+      ]
+    },
+    {
+      "id": "NudgeBanner",
+      "file_name": "mobile/app/components/nudges/NudgeBanner.tsx",
+      "description": "Context-aware gentle reminder banner.",
+      "props": {
+        "visible": "boolean",
+        "message": "string",
+        "onStart": "() => void",
+        "onDismiss": "() => void"
+      },
+      "required_props": ["visible", "message"],
+      "accessibility_notes": [
+        "Provide buttons 'Start' and 'Dismiss'; respect quiet hours by not rendering or aria-hidden"
+      ],
+      "implementation_notes": "Slide in bottom within sweet heat window; auto-dismiss with inactivity.",
+      "usage_examples": [
+        "<NudgeBanner visible message='Your Reading lantern is ready to light 🏮' onStart={startHabit} onDismiss={dismiss} />"
+      ]
+    },
+    {
+      "id": "DeepLinkButton",
+      "file_name": "mobile/app/components/DeepLinkButton.tsx",
+      "description": "Button that opens external resource via deep link manager.",
+      "props": {
+        "url": "string",
+        "label": "string",
+        "onFail": "() => void | undefined"
+      },
+      "required_props": ["url", "label"],
+      "accessibility_notes": [
+        "Announce domain/app name; open in appropriate app; confirm failure with toast"
+      ],
+      "implementation_notes": "Use Linking.canOpenURL then openURL; log hashed URL on failure.",
+      "usage_examples": [
+        "<DeepLinkButton url='notion://page/abc123' label='Open Resource' />"
+      ]
+    },
+    {
+      "id": "ListEmptyState",
+      "file_name": "mobile/app/components/ListEmptyState.tsx",
+      "description": "Empty state with icon, title, and action.",
+      "props": {
+        "title": "string",
+        "subtitle": "string | null",
+        "actionLabel": "string | null",
+        "onAction": "() => void | undefined"
+      },
+      "required_props": ["title"],
+      "accessibility_notes": [
+        "Role='summary'; ensure action is focusable with role=button"
+      ],
+      "implementation_notes": "Used when no habits configured or no past sessions.",
+      "usage_examples": [
+        "<ListEmptyState title='No habits yet' actionLabel='Add a habit' onAction={addHabit} />"
+      ]
+    },
+    {
+      "id": "LoadingSpinner",
+      "file_name": "mobile/app/components/feedback/LoadingSpinner.tsx",
+      "description": "Indeterminate spinner with reduced motion fallback.",
+      "props": {
+        "size": "'sm' | 'md' | 'lg'",
+        "label": "string | null"
+      },
+      "required_props": [],
+      "accessibility_notes": [
+        "Provide accessibilityLabel when label is null, e.g., 'Loading'"
+      ],
+      "implementation_notes": "Use ActivityIndicator; stop animation if reduced motion is enabled and show progress text.",
+      "usage_examples": [
+        "<LoadingSpinner size='md' label='Syncing' />"
+      ]
+    },
+    {
+      "id": "Sheet",
+      "file_name": "mobile/app/components/primitives/Sheet.tsx",
+      "description": "Bottom sheet primitive used for modals like Unlocks and Privacy.",
+      "props": {
+        "visible": "boolean",
+        "onClose": "() => void",
+        "children": "React.ReactNode",
+        "initialSnap": "number"
+      },
+      "required_props": ["visible", "onClose", "children"],
+      "accessibility_notes": [
+        "Treat as modal; focus trap; swipe to close has button alternative"
+      ],
+      "implementation_notes": "Use react-native-gesture-handler + reanimated; animate per sheet_open spec.",
+      "usage_examples": [
+        "<Sheet visible onClose={close}><Content /></Sheet>"
+      ]
+    },
+    {
+      "id": "ProgressPill",
+      "file_name": "mobile/app/components/ProgressPill.tsx",
+      "description": "Pill indicator for 'none' | 'floor' | 'target' | 'stretch' progress.",
+      "props": {
+        "state": "'none' | 'floor' | 'target' | 'stretch'",
+        "compact": "boolean"
+      },
+      "required_props": ["state"],
+      "accessibility_notes": [
+        "Announce semantic status, e.g., 'Floor met today'"
+      ],
+      "implementation_notes": "Background and text color from semantic tokens.",
+      "usage_examples": [
+        "<ProgressPill state='floor' />"
+      ]
+    },
+    {
+      "id": "AccessibilityAnnouncer",
+      "file_name": "mobile/app/components/accessibility/AccessibilityAnnouncer.tsx",
+      "description": "Utility component to announce messages via screen reader.",
+      "props": {
+        "message": "string",
+        "important": "boolean"
+      },
+      "required_props": ["message"],
+      "accessibility_notes": [
+        "Uses AccessibilityInfo.announceForAccessibility; do not overuse"
+      ],
+      "implementation_notes": "Render null; side-effect announce on prop change.",
+      "usage_examples": [
+        "<AccessibilityAnnouncer message='Floor reached' />"
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "name": "Home",
+      "component_ids": ["ScreenShell", "AppHeader", "HabitCard", "BottomActionsBar", "NudgeBanner", "ListEmptyState", "TokenBucketIcon"],
+      "interactions": [
+        {
+          "event": "onRingPress",
+          "from_component": "AppHeader",
+          "action": "navigate",
+          "to_screen": "SundayChapter"
+        },
+        {
+          "event": "onStart",
+          "from_component": "HabitCard",
+          "action": "navigate_with_params",
+          "to_screen": "Timer",
+          "params": ["habitId"]
+        },
+        {
+          "event": "onSettingsPress",
+          "from_component": "BottomActionsBar",
+          "action": "navigate",
+          "to_screen": "Settings"
+        }
+      ],
+      "responsive": {
+        "columns": { "sm": 1, "md": 2 },
+        "card_min_size": 320
+      }
+    },
+    {
+      "name": "Timer",
+      "component_ids": ["ScreenShell", "TimerCircularProgress", "TimeRemainingLabel", "ContinueButton", "CancelHoldButton", "DeepLinkButton", "TokenBucketIcon", "AccessibilityAnnouncer"],
+      "interactions": [
+        {
+          "event": "onComplete",
+          "from_component": "TimerCircularProgress",
+          "action": "animate_and_update",
+          "animation": "floor_completion_ripple",
+          "then": [{ "action": "show", "component": "ContinueButton" }]
+        },
+        {
+          "event": "onPress",
+          "from_component": "ContinueButton",
+          "action": "advance_phase",
+          "to_phase": "target"
+        },
+        {
+          "event": "onLongPress",
+          "from_component": "CancelHoldButton",
+          "action": "confirm_and_end_session",
+          "navigate_back": true
+        }
+      ],
+      "responsive": {
+        "portrait": { "ring_size": 220 },
+        "landscape": { "ring_size": 160 }
+      }
+    },
+    {
+      "name": "Onboarding.Avatar",
+      "component_ids": ["ScreenShell", "AvatarGrid", "TryNowButton"],
+      "interactions": [
+        { "event": "onSelect", "from_component": "AvatarGrid", "action": "persist_and_next", "to_screen": "Onboarding.HabitSetup" }
+      ]
+    },
+    {
+      "name": "Onboarding.HabitSetup",
+      "component_ids": ["ScreenShell", "HabitPresetSelector", "ListEmptyState"],
+      "interactions": [
+        { "event": "onChange", "from_component": "HabitPresetSelector", "action": "update_preset_state" }
+      ]
+    },
+    {
+      "name": "Onboarding.QuietHours",
+      "component_ids": ["ScreenShell", "QuietHoursSlider"],
+      "interactions": [
+        { "event": "onChange", "from_component": "QuietHoursSlider", "action": "update_quiet_hours" }
+      ]
+    },
+    {
+      "name": "Onboarding.Demo",
+      "component_ids": ["ScreenShell", "DemoTileAnimation"],
+      "interactions": []
+    },
+    {
+      "name": "Onboarding.FirstTrial",
+      "component_ids": ["ScreenShell", "TryNowButton"],
+      "interactions": [
+        { "event": "onPress", "from_component": "TryNowButton", "action": "navigate", "to_screen": "Timer" }
+      ]
+    },
+    {
+      "name": "HabitDetails",
+      "component_ids": ["ScreenShell", "ConsistencyRing", "DeepLinkButton", "ProgressPill"],
+      "interactions": []
+    },
+    {
+      "name": "Settings",
+      "component_ids": ["ScreenShell", "SettingsList"],
+      "interactions": [
+        { "event": "onPress", "from_component": "SettingsList", "action": "navigate", "to_screen": "PrivacyCenter" }
+      ]
+    },
+    {
+      "name": "PrivacyCenter",
+      "component_ids": ["ScreenShell", "PrivacyConsentDialog"],
+      "interactions": []
+    },
+    {
+      "name": "SundayChapter",
+      "component_ids": ["ScreenShell", "ConsistencyRing", "ListEmptyState"],
+      "interactions": []
+    },
+    {
+      "name": "SyncQueue",
+      "component_ids": ["ScreenShell", "ListEmptyState", "LoadingSpinner"],
+      "interactions": []
+    },
+    {
+      "name": "Unlocks",
+      "component_ids": ["ScreenShell", "UnlockModal"],
+      "interactions": [
+        { "event": "onClose", "from_component": "UnlockModal", "action": "dismiss_and_return" }
+      ]
+    }
+  ],
+  "tailwind_tokens": {
+    "colors": {
+      "deep-navy": "#0B2340",
+      "forest-emerald": "#0E6B4A",
+      "warm-gold": "#D4A53E",
+      "parchment": "#F6EFE6",
+      "muted-crimson": "#A83E3E",
+      "soft-ink": "#2E2E2E",
+      "overlay-glow": "rgba(255,255,255,0.06)",
+      "semantic": {
+        "primary": "#0B2340",
+        "success": "#0E6B4A",
+        "accent": "#D4A53E",
+        "surface": "#F6EFE6",
+        "warning": "#A83E3E",
+        "text": "#2E2E2E",
+        "floor": "#0E6B4A",
+        "target": "#D4A53E",
+        "stretch": "#0B2340"
+      }
+    },
+    "typography": {
+      "fontFamilies": {
+        "hero": "'Crimson Text', serif",
+        "body": "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+        "numeric": "'SF Mono', ui-monospace, Menlo, monospace"
+      },
+      "sizes": {
+        "xs": "0.75rem",
+        "sm": "0.875rem",
+        "base": "1rem",
+        "lg": "1.125rem",
+        "xl": "1.25rem",
+        "2xl": "1.5rem",
+        "3xl": "1.875rem",
+        "4xl": "2.25rem"
+      },
+      "weights": { "regular": 400, "medium": 500, "semibold": 600, "bold": 700 },
+      "lineHeights": { "tight": 1.2, "snug": 1.35, "normal": 1.5, "relaxed": 1.65 },
+      "classes": {
+        "text-hero": { "fontFamily": "hero", "fontSize": "2rem", "fontWeight": 600, "lineHeight": 1.2 },
+        "text-body": { "fontFamily": "body", "fontSize": "1rem", "fontWeight": 400, "lineHeight": 1.5 },
+        "text-numeric": { "fontFamily": "numeric", "fontVariantNumeric": "tabular-nums", "fontWeight": 500 }
+      }
+    },
+    "spacing": {
+      "px": "1px",
+      "0": "0px",
+      "1": "4px",
+      "2": "8px",
+      "3": "12px",
+      "4": "16px",
+      "5": "20px",
+      "6": "24px",
+      "8": "32px",
+      "10": "40px",
+      "12": "48px",
+      "16": "64px",
+      "20": "80px",
+      "24": "96px"
+    },
+    "radii": { "none": 0, "sm": 6, "md": 10, "lg": 14, "xl": 20, "full": 999 },
+    "shadows": {
+      "sm": "0 1px 2px rgba(0,0,0,0.06)",
+      "md": "0 4px 8px rgba(0,0,0,0.12)",
+      "lg": "0 10px 20px rgba(0,0,0,0.18)"
+    },
+    "opacity": { "disabled": 0.5, "muted": 0.75, "overlay": 0.06 },
+    "breakpoints": { "sm": 360, "md": 768, "lg": 1024 },
+    "zIndex": { "base": 0, "header": 10, "modal": 100, "toast": 110, "sheet": 120 },
+    "usage": {
+      "buttons": {
+        "primary": { "bg": "semantic.accent", "text": "#0B2340", "radius": "xl" },
+        "secondary": { "bg": "semantic.surface", "text": "semantic.text", "radius": "lg" }
+      },
+      "cards": { "bg": "semantic.surface", "shadow": "md", "radius": "xl" },
+      "timer": { "ring.floor": "semantic.floor", "ring.target": "semantic.target", "ring.stretch": "semantic.stretch" }
+    }
+  },
+  "animation_specs": {
+    "token_award": {
+      "spawn": { "count": 8, "origin": "session_complete_button", "particle": { "size": [4, 8], "color": "#D4A53E", "opacity": [1, 0], "duration": 800 } },
+      "path": { "type": "bezier", "control1": { "x": 0.2, "y": -0.3 }, "control2": { "x": 0.8, "y": -0.1 }, "destination": "token_bucket_icon" },
+      "completion": { "bounce": { "scale": [1.0, 1.2, 1.0], "duration": 200 }, "glow": { "opacity": [0.3, 0.8, 0.3], "duration": 600 } },
+      "reduced_motion": { "strategy": "skip_particles_show_bounce_only" }
+    },
+    "floor_completion_ripple": {
+      "trigger": "floor_timer_complete",
+      "effect": { "type": "expanding_ring", "startRadius": 0, "endRadius": 100, "color": "#0E6B4A", "opacity": [0.8, 0], "duration": 350, "easing": "easeOutCubic" },
+      "followUp": { "delay": 100, "haptic": { "type": "success", "duration": 50 } },
+      "reduced_motion": { "strategy": "instant_state_change_and_haptic_only" }
+    },
+    "button_press": {
+      "scale": [1.0, 0.97, 1.0],
+      "duration": 120,
+      "easing": "cubic-bezier(0.2, 0.0, 0.0, 1.0)"
+    },
+    "sheet_open": {
+      "translateY": [32, 0],
+      "opacity": [0, 1],
+      "duration": 240,
+      "easing": "easeOutQuad"
+    },
+    "ring_pulse": {
+      "scale": [1.0, 1.05, 1.0],
+      "opacity": [1, 0.9, 1],
+      "duration": 800,
+      "loop": true
+    },
+    "nudge_slidein": {
+      "translateY": [40, 0],
+      "opacity": [0, 1],
+      "duration": 260,
+      "easing": "easeOutCubic"
+    },
+    "toast_show": {
+      "translateY": [-20, 0],
+      "opacity": [0, 1],
+      "duration": 180,
+      "easing": "easeOutQuad"
+    }
+  }
+}

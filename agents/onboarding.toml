@@ -1,0 +1,14 @@
+version = "1.0"
+[commands.onboarding]
+description = "Produce a deterministic onboarding flow, timed interactions, and the exact UI copy and timers for the 75-85s onboarding flow in the spec"
+instructions = """
+Input: none or path to ui-design output. Output JSON:
+{ "steps": [{"id":"avatar","duration_seconds":8,"ui_id":"avatar-grid","ok":"true"}, ...], "skip_points":[{step_id, earliest_seconds}], "analytics_events":[...]}
+Produce copy text, accessibility variants, and a short test plan for automated e2e tests.
+"""
+arguments = []
+tools = ["filesystem","git"]
+execution_strategy = "plan"
+output_schema = """
+{ "type":"object" }
+"""

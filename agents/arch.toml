@@ -1,0 +1,16 @@
+version = "1.0"
+[commands.arch]
+description = "Produce an architecture decision record, repo scaffold plan, DB schema outline, infra IaC suggestions, and a file list for the scaffold"
+instructions = """
+Input: path to pm output JSON or to the spec. Output a JSON object with keys: stack_choice, services, folder_scaffold (array of {path, purpose}), iac_suggestions, db_tables (DDL snippets), api_routes (OpenAPI-like list).
+Pick a default stack if none provided: Node.js + TypeScript, Postgres, Redis, REST API, mobile clients in Swift/Kotlin. Keep choices conservative for developer ergonomics.
+Return patch-ready file list (filenames and sample contents summary) so codegen agents can create files.
+"""
+arguments = [
+  { name = "spec_path", type = "string", required = true, description = "Path to the input PM/spec JSON file" }
+]
+tools = ["filesystem","git","shell"]
+execution_strategy = "plan"
+output_schema = """
+{ "type":"object" }
+"""

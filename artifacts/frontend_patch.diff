@@ -1,0 +1,79 @@
+From 9b38e217631b0270ce0b3917a538c7cb36b25620 Mon Sep 17 00:00:00 2001
+From: Aether Bot <devnull@example.com>
+Date: Sat, 16 Aug 2025 02:30:20 +0300
+Subject: [PATCH 1/2] feat(frontend): scaffold RN app with onboarding, timer,
+ i18n, tests
+
+---
+ README.md                        |   1 +
+ TODO.md                          |  10 +++
+ __tests__/onboarding.test.tsx    |  20 ++++++
+ __tests__/timer.test.tsx         |  20 ++++++
+ babel.config.js                  |   3 +
+ e2e/tests/onboarding.spec.ts     |   7 ++
+ e2e/tests/timer.spec.ts          |   7 ++
+ package.json                     |  60 ++++++++++++++++
+ src/App.tsx                      |  14 ++++
+ src/components/Button.tsx        |  60 ++++++++++++++++
+ src/components/ProgressRing.tsx  |  46 ++++++++++++
+ src/i18n/en.json                 |  23 ++++++
+ src/i18n/keys.ts                 |  25 +++++++
+ src/navigation/AppNavigator.tsx  |  23 ++++++
+ src/screens/OnboardingScreen.tsx |  78 ++++++++++++++++++++
+ src/screens/TimerScreen.tsx      | 119 +++++++++++++++++++++++++++++++
+ src/styles/tokens.ts             |  33 +++++++++
+ src/utils/i18n.ts                |  23 ++++++
+ tsconfig.json                    |  24 +++++++
+ 19 files changed, 596 insertions(+)
+ create mode 100644 README.md
+ create mode 100644 TODO.md
+ create mode 100644 __tests__/onboarding.test.tsx
+ create mode 100644 __tests__/timer.test.tsx
+ create mode 100644 babel.config.js
+ create mode 100644 e2e/tests/onboarding.spec.ts
+ create mode 100644 e2e/tests/timer.spec.ts
+ create mode 100644 package.json
+ create mode 100644 src/App.tsx
+ create mode 100644 src/components/Button.tsx
+ create mode 100644 src/components/ProgressRing.tsx
+ create mode 100644 src/i18n/en.json
+ create mode 100644 src/i18n/keys.ts
+ create mode 100644 src/navigation/AppNavigator.tsx
+ create mode 100644 src/screens/OnboardingScreen.tsx
+ create mode 100644 src/screens/TimerScreen.tsx
+ create mode 100644 src/styles/tokens.ts
+ create mode 100644 src/utils/i18n.ts
+ create mode 100644 tsconfig.json
+
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..986524d
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1 @@
++# Frontend
+From c0fc8307108d3d2539e061030f52e40bf870e592 Mon Sep 17 00:00:00 2001
+From: Aether Bot <devnull@example.com>
+Date: Sat, 16 Aug 2025 02:30:32 +0300
+Subject: [PATCH 2/2] docs(frontend): add README with usage notes
+
+---
+ README.md | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index 986524d..6410b4d 100644
+--- a/README.md
++++ b/README.md
+@@ -1 +1,10 @@
+-# Frontend
++Aether Frontend (React Native)
++
++- Minimal scaffold with onboarding flow and session timer (floor → target → stretch).
++- Accessibility labels and i18n keys included.
++- Jest unit tests for onboarding and timer; Playwright e2e placeholders.
++
++Scripts
++- npm run typecheck
++- npm test
++- npm run e2e (placeholder)

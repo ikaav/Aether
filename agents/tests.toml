@@ -1,0 +1,17 @@
+version = "1.0"
+[commands.tests]
+description = "Generate, run, and report unit, integration, and e2e tests. Failures should produce draft bug reports and suggested patches."
+instructions = """
+Input: project root. Run:
+- unit tests for algorithms, integration tests for session flows, play/puppeteer e2e for onboarding flow
+- produce a JSON test report: { success: boolean, failures: [{file, message, suggestion}] }
+If failures occur, produce a suggested git patch that fixes the simplest failing case.
+"""
+arguments = [
+  { name = "project_root", type = "string", required = true, description = "project root" }
+]
+tools = ["filesystem","shell","git"]
+execution_strategy = "act"
+output_schema = """
+{ "type":"object" }
+"""
